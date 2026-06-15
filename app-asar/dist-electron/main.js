@@ -27230,6 +27230,113 @@ const openMessageWindow = () => {
   };
   (!PDDMessageWindow.win || PDDMessageWindow.win.isDestroyed()) && PDDMessageWindow.createMessageWindow("拼多多", e), setPromptWindowVisible(PDDMessageWindow.win, !1), (!aiRepliedMessageWindow.win || aiRepliedMessageWindow.win.isDestroyed()) && aiRepliedMessageWindow.createAiRepliedMessageWindow(), setPromptWindowVisible(aiRepliedMessageWindow.win, !1), (!aiMissedMessageWindow.win || aiMissedMessageWindow.win.isDestroyed()) && aiMissedMessageWindow.createAiMissedMessageWindow(), setPromptWindowVisible(aiMissedMessageWindow.win, !1), (!aiErrorMessageWindow.win || aiErrorMessageWindow.win.isDestroyed()) && aiErrorMessageWindow.createAiErrorMessageWindow(), setPromptWindowVisible(aiErrorMessageWindow.win, !1);
 };
+let popupDebugVisible = !1;
+function getPopupDebugSamples() {
+  const e = Math.floor(Date.now() / 1e3), t = "codex-popup-debug-message", r = 999001, n = "调试测试店铺";
+  return {
+    shop: {
+      shopId: r,
+      shopName: n
+    },
+    customerMessage: {
+      messageId: t,
+      userId: "debug-user-001",
+      username: "调试买家",
+      avatar: "",
+      content: "这是一条本地调试客服消息，用来测试消息通知弹窗。",
+      shopSystemId: r,
+      shopName: n,
+      loginUrl: "",
+      platformLogo: "./assets/todo-work-order-icon.png",
+      platformType: "拼多多",
+      timeout: e + 180
+    },
+    aiRepliedMessage: {
+      messageId: "codex-popup-debug-ai-replied",
+      userId: "debug-user-002",
+      username: "AI回复测试买家",
+      userQuestion: "请帮我确认发货时间",
+      content: "您好，这是一条本地调试 AI 已回复消息。",
+      avatar: "",
+      isAiToHuman: !1,
+      shopSystemId: r,
+      shopName: n,
+      loginUrl: "",
+      platformLogo: "./assets/todo-work-order-icon.png",
+      platformType: "拼多多",
+      shouldShowModal: !0,
+      timeout: e + 120
+    },
+    aiMissedMessage: {
+      content: "本地调试：这条买家问题需要人工处理。",
+      time: new Date().toLocaleString("zh-CN", { hour12: !1 }),
+      shop: {
+        shopName: n,
+        shopId: r
+      },
+      token: "popup-debug-token"
+    },
+    aiErrorMessage: {
+      shopSystemId: r,
+      username: "纠错测试买家",
+      userContent: "这个商品有现货吗？",
+      content: "本地调试：AI 回复内容待纠错。",
+      time: Date.now(),
+      timestring: new Date().toLocaleString("zh-CN", { hour12: !1 })
+    },
+    todoList: {
+      shopSystemId: r,
+      shopName: n,
+      platformLogo: "./assets/todo-work-order-icon.png",
+      platformType: "拼多多",
+      list: [
+        {
+          instanceId: "codex-popup-debug-todo",
+          orderSn: "DEBUG-TODO-ORDER",
+          deadline: e + 3600,
+          problemTitle: "本地调试工单：处理工单悬浮球"
+        }
+      ]
+    }
+  };
+}
+function clampPopupDebugValue(e, t, r) {
+  return Math.min(Math.max(e, t), r);
+}
+function setPopupDebugBounds(e, t) {
+  if (!e || e.isDestroyed())
+    return;
+  const r = screen.getDisplayMatching(e.getBounds()).workArea, n = Math.min(t.width, r.width - 24), s = Math.min(t.height, r.height - 24), i = clampPopupDebugValue(t.x, r.x + 12, r.x + r.width - n - 12), o = clampPopupDebugValue(t.y, r.y + 12, r.y + r.height - s - 12);
+  e.setBounds({ x: Math.round(i), y: Math.round(o), width: Math.round(n), height: Math.round(s) });
+}
+function layoutPopupDebugWindows() {
+  const e = screen.getPrimaryDisplay().workArea, t = 12, r = e.x + Math.min(e.width, 2048) - t, n = e.y + t, s = Math.min(620, e.height - 360);
+  setPopupDebugBounds(todoListWindow.win, { x: r - 96, y: n + 8, width: 96, height: 96 });
+  setPopupDebugBounds(aiRepliedMessageWindow.win, { x: r - 300, y: n + 124, width: 300, height: 220 });
+  setPopupDebugBounds(PDDMessageWindow.win, { x: r - 380, y: n + 356, width: 380, height: Math.max(320, s) });
+  setPopupDebugBounds(aiErrorMessageWindow.win, { x: e.x + t, y: n + 8, width: 340, height: 260 });
+  setPopupDebugBounds(aiMissedMessageWindow.win, { x: e.x + t, y: n + 288, width: 340, height: Math.min(420, e.height - 320) });
+}
+function sendPopupDebugPayload(e, t, r, n = 150) {
+  if (!e || e.isDestroyed())
+    return;
+  const s = e.webContents, i = () => {
+    setTimeout(() => {
+      e && !e.isDestroyed() && e.webContents.send(t, r);
+    }, n);
+  };
+  typeof s.isLoadingMainFrame == "function" && s.isLoadingMainFrame() || s.isLoading() ? s.once("did-finish-load", i) : i();
+}
+function showPopupDebugMode() {
+  const e = getPopupDebugSamples();
+  openMessageWindow(), layoutPopupDebugWindows(), [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((t) => setPromptWindowVisible(t, !0)), sendTodoListToWindow(e.todoList), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.customerMessage), sendPopupDebugPayload(aiRepliedMessageWindow.win, "get-ai-replied-message", e.aiRepliedMessage), sendPopupDebugPayload(aiMissedMessageWindow.win, "add-ai-missed-message", e.aiMissedMessage), sendPopupDebugPayload(aiErrorMessageWindow.win, "get-aierror-select-shop", e.shop, 120), sendPopupDebugPayload(aiErrorMessageWindow.win, "add-ai-error-message", e.aiErrorMessage, 220), popupDebugVisible = !0, Log.info("[popup-debug] show all prompt windows with local samples");
+}
+function hidePopupDebugMode() {
+  [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((e) => setPromptWindowVisible(e, !1)), popupDebugVisible = !1, Log.info("[popup-debug] hide all prompt windows");
+}
+function togglePopupDebugMode() {
+  popupDebugVisible ? hidePopupDebugMode() : showPopupDebugMode();
+}
 ipcMain$1.on(
   "toggle-message-window",
   (e, t) => {
@@ -27400,6 +27507,20 @@ const registerShortcutKeys = () => {
       } catch (r) {
         Log.error(`注册快捷键失败: ${t.key}, 错误: ${r.message}`), console.error(`注册快捷键失败: ${t.key}`, r);
       }
+  }
+  try {
+    const e = globalShortcut.register("CommandOrControl+Shift+Home", () => {
+      debounceShortcut(
+        "CommandOrControl+Shift+Home",
+        () => {
+          Log.info("[popup-debug] toggle by Ctrl+Shift+Home"), togglePopupDebugMode();
+        },
+        500
+      );
+    });
+    e || Log.warn("[popup-debug] 注册 Ctrl+Shift+Home 快捷键失败");
+  } catch (e) {
+    Log.error(`[popup-debug] 注册 Ctrl+Shift+Home 快捷键异常: ${e.message}`), console.error("[popup-debug] 注册快捷键异常", e);
   }
 }, unregisterShortcutKeys = () => {
   globalShortcut.unregisterAll();

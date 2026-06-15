@@ -66,6 +66,11 @@ ok("main has todo listen-test logs", has(sources.main, "[listen-test][todo-colla
 ok("main has message resize listen-test logs", has(sources.main, "[listen-test][message-resize]"));
 ok("main keeps todo window right-anchored", has(sources.main, "s.x + s.width") && has(sources.main, "d - r"));
 ok("main creates todo floating ball near right edge", has(sources.main, "t.x + t.width - r - 24"));
+ok("main registers popup debug shortcut", has(sources.main, "CommandOrControl+Shift+Home"));
+ok("main can toggle popup debug mode", has(sources.main, "togglePopupDebugMode"));
+ok("main keeps popup debug local samples", has(sources.main, "getPopupDebugSamples") && has(sources.main, "调试测试店铺"));
+ok("main popup debug shows every popup", has(sources.main, "showPopupDebugMode") && has(sources.main, "add-ai-missed-message") && has(sources.main, "add-ai-error-message") && has(sources.main, "get-customer-message"));
+ok("main popup debug hides prompt windows", has(sources.main, "hidePopupDebugMode") && has(sources.main, "[popup-debug] hide all prompt windows"));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
