@@ -26819,11 +26819,12 @@ class createWindow {
   }
   // 工单窗口
   createTodoListWindow() {
+    const t = screen.getPrimaryDisplay().workArea, r = 96, n = 96;
     this.win = new BrowserWindow({
       icon: path$2.join(process.env.VITE_PUBLIC ?? "", "electron-vite.svg"),
       resizable: !1,
-      width: 96,
-      height: 96,
+      width: r,
+      height: n,
       alwaysOnTop: !0,
       transparent: !0,
       backgroundColor: "#00000000",
@@ -26844,8 +26845,8 @@ class createWindow {
         devTools: process.env.NODE_ENV === "development"
         // 允许使用开发者工具
       },
-      x: 10,
-      y: 10
+      x: Math.max(t.x, t.x + t.width - r - 24),
+      y: Math.min(Math.max(t.y + 120, t.y), t.y + t.height - n)
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.loadURL("todoList"), this.win.hookWindowMessage(278, () => {
       if (this.win) {
         this.win.setEnabled(!1);

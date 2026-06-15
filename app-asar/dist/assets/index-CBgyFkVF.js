@@ -134,6 +134,14 @@ const _ = { class: "container" },
             (Q.moved = !1),
             window.removeEventListener("mousemove", ee));
         },
+        ae = () => {
+          h().then(() => {
+            const e = document.querySelector(".container");
+            e &&
+              (e.classList.toggle("is-collapsed", Z.value),
+              e.classList.toggle("is-expanded", !Z.value));
+          });
+        },
         se = (e) => {
           Date.now() < Q.suppressClickUntil
             ? (e.preventDefault(), e.stopPropagation())
@@ -155,6 +163,7 @@ const _ = { class: "container" },
           const e = P.value.length > 0;
           (x.postMessage("toggle-message-window", { platform: "todo", show: e }),
             (q.value = e),
+            ae(),
             (O = setInterval(() => {
               P.value.forEach((e) => {
                 let t = 1e3 * e.deadline - new Date().getTime();
@@ -170,7 +179,7 @@ const _ = { class: "container" },
             }, 1e3)));
         }),
         s(Z, (e) => {
-          x.postMessage("todoList-collapse", e);
+          (ae(), x.postMessage("todoList-collapse", e));
         }),
         a(() => {
           (O && clearInterval(O),
@@ -203,7 +212,7 @@ const _ = { class: "container" },
               f,
               null,
               [
-                n("div", { class: ["container", Z.value ? "is-collapsed" : "is-expanded"] }, [
+                n("div", { class: Z.value ? "container is-collapsed" : "container is-expanded" }, [
                   p(
                     n(
                       "div",

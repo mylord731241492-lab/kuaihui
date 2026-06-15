@@ -65,6 +65,7 @@ ok("main has popup listen-test logs", has(sources.main, "[listen-test][popup-tog
 ok("main has todo listen-test logs", has(sources.main, "[listen-test][todo-collapse]"));
 ok("main has message resize listen-test logs", has(sources.main, "[listen-test][message-resize]"));
 ok("main keeps todo window right-anchored", has(sources.main, "s.x + s.width") && has(sources.main, "d - r"));
+ok("main creates todo floating ball near right edge", has(sources.main, "t.x + t.width - r - 24"));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
@@ -82,7 +83,10 @@ ok("todo floating ball sends move IPC", has(sources.todo, '"move-todo-floating-w
 ok("todo collapse button exists", has(sources.todo, "todo-collapse-btn"));
 ok("todo floating CSS exists", has(sources.todoCss, ".todo-floating-ball"));
 ok("todo panel has expanded and collapsed states", has(sources.todo, "is-collapsed") && has(sources.todo, "is-expanded"));
+ok("todo syncs expanded and collapsed classes", has(sources.todo, "classList.toggle(\"is-expanded\""));
 ok("todo expanded panel is solid white", has(sources.todoCss, ".container.is-expanded") && has(sources.todoCss, "background: #ffffff"));
+ok("todo expanded panel hides floating ball", has(sources.todoCss, ".container.is-expanded .todo-floating-ball") && has(sources.todoCss, "display: none !important"));
+ok("todo collapsed panel hides expanded content", has(sources.todoCss, ".container.is-collapsed .header") && has(sources.todoCss, ".container.is-collapsed .n-scrollbar"));
 ok("todo floating ball uses work order icon", has(sources.todoCss, "todo-work-order-icon.png"));
 ok("todo work order icon asset exists", fs.existsSync(path.join(root, "app-asar/dist/assets/todo-work-order-icon.png")));
 

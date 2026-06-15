@@ -33,6 +33,20 @@ body,
   border: 0;
   box-shadow: none;
 }
+.container.is-expanded .todo-floating-ball {
+  display: none !important;
+}
+.container.is-expanded .header {
+  display: flex !important;
+}
+.container.is-expanded .n-scrollbar {
+  display: block !important;
+  background: #ffffff;
+}
+.container.is-collapsed .header,
+.container.is-collapsed .n-scrollbar {
+  display: none !important;
+}
 .container .todo-floating-ball {
   width: 88px;
   height: 88px;
