@@ -829,7 +829,8 @@ const Ce = A("n-float-button-group"),
           KhaiShopPointerDrag = null,
           KhaiShopSuppressClickUntil = 0;
         const KhaiShopDragStyleId = "khai-shop-drag-sort-style",
-          KhaiShopCardId = (e) => Number(String(e == null ? void 0 : e.id).replace("shop-", "")),
+          KhaiShopCardId = (e) => String(e == null ? void 0 : e.id).replace(/^shop-/, ""),
+          KhaiShopSameId = (e, o) => String(e) === String(o),
           KhaiShopGetCard = (e) =>
             e && e.closest ? e.closest('[id^="shop-"]') : null,
           KhaiShopClearDragState = () => {
@@ -852,18 +853,18 @@ const Ce = A("n-float-button-group"),
                 const e = document.createElement("style");
                 ((e.id = KhaiShopDragStyleId),
                   (e.textContent =
-                    '[id^="shop-"].khai-shop-draggable{cursor:grab;user-select:none;transition:box-shadow .16s ease,border-color .16s ease,background-color .16s ease}[id^="shop-"].khai-shop-draggable:active{cursor:grabbing}[id^="shop-"].khai-shop-dragging{opacity:.82;box-shadow:0 12px 26px rgba(37,99,235,.28)!important;position:relative;z-index:20;pointer-events:none}[id^="shop-"].khai-shop-drag-over{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.22)!important;background:#eff6ff!important}'));
+                    '[id^="shop-"].khai-shop-draggable{cursor:grab;user-select:none;touch-action:none;transition:box-shadow .16s ease,border-color .16s ease,background-color .16s ease}[id^="shop-"].khai-shop-draggable:active{cursor:grabbing}[id^="shop-"].khai-shop-dragging{opacity:.82;box-shadow:0 12px 26px rgba(37,99,235,.28)!important;position:relative;z-index:20;pointer-events:none}[id^="shop-"].khai-shop-drag-over{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.22)!important;background:#eff6ff!important}'));
                 document.head.appendChild(e);
               })();
             document.querySelectorAll('[id^="shop-"]').forEach((e) => {
-              ((e.draggable = !1),
+              ((e.draggable = !0),
                 e.classList.add("khai-shop-draggable"),
                 e.setAttribute("title", "拖动调整店铺排序"));
             });
           },
           KhaiShopMoveToIndex = (e, o) => {
             if (null == e || null == o) return !1;
-            const a = s.shopList.findIndex((o) => Number(o.id) === Number(e));
+            const a = s.shopList.findIndex((o) => KhaiShopSameId(o.id, e));
             if (a < 0) return !1;
             let t = Math.max(0, Math.min(Number(o), s.shopList.length));
             if ((a < t && t--, a === t)) return !1;
@@ -871,6 +872,7 @@ const Ce = A("n-float-button-group"),
             return (
               s.shopList.splice(t, 0, l),
               s.saveShopDataToCache && s.saveShopDataToCache(),
+              ee.log.info(`[listen-test][shop-drag-sort] shopId=${e}, from=${a}, to=${t}`),
               f(() => {
                 KhaiShopApplyDragAttrs();
               }),
@@ -881,12 +883,12 @@ const Ce = A("n-float-button-group"),
             Array.from(document.querySelectorAll('[id^="shop-"].khai-shop-draggable')).filter(
               (e) =>
                 e.offsetParent &&
-                (!KhaiShopPointerDrag || KhaiShopCardId(e) !== KhaiShopPointerDrag.id),
+                (!KhaiShopPointerDrag || !KhaiShopSameId(KhaiShopCardId(e), KhaiShopPointerDrag.id)),
             ),
           KhaiShopGetInsertIndex = (e) => {
             let o = null;
             for (const a of KhaiShopGetVisibleCards()) {
-              const t = s.shopList.findIndex((e) => Number(e.id) === KhaiShopCardId(a));
+              const t = s.shopList.findIndex((e) => KhaiShopSameId(e.id, KhaiShopCardId(a)));
               if (t < 0) continue;
               o = t;
               const l = a.getBoundingClientRect();
@@ -895,7 +897,7 @@ const Ce = A("n-float-button-group"),
             return null == o ? null : o + 1;
           },
           KhaiShopMove = (e, o) => {
-            const a = s.shopList.findIndex((e) => Number(e.id) === Number(o));
+            const a = s.shopList.findIndex((e) => KhaiShopSameId(e.id, o));
             a >= 0 && KhaiShopMoveToIndex(e, a);
           },
           KhaiShopIsInteractiveTarget = (e) =>
@@ -911,9 +913,11 @@ const Ce = A("n-float-button-group"),
             e && e.classList.add("khai-shop-drag-over");
           },
           KhaiShopOnMouseDown = (e) => {
+            if (KhaiShopPointerDrag) return;
             if (e.button !== 0 || KhaiShopIsInteractiveTarget(e.target)) return;
             const o = KhaiShopGetCard(e.target);
             if (!o) return;
+            ee.log.info(`[listen-test][shop-drag-down] shopId=${KhaiShopCardId(o)}`);
             KhaiShopPointerDrag = {
               id: KhaiShopCardId(o),
               startX: e.clientX,
@@ -933,6 +937,7 @@ const Ce = A("n-float-button-group"),
               ((KhaiShopPointerDrag.active = !0),
                 (KhaiShopDragId = KhaiShopPointerDrag.id),
                 KhaiShopPointerDrag.card.classList.add("khai-shop-dragging"),
+                ee.log.info(`[listen-test][shop-drag-start] shopId=${KhaiShopPointerDrag.id}`),
                 (KhaiShopPointerDrag.card.style.zIndex = "20"),
                 (KhaiShopPointerDrag.card.style.pointerEvents = "none"),
                 (document.body.style.userSelect = "none"),
@@ -953,24 +958,45 @@ const Ce = A("n-float-button-group"),
               a = null == o.insertIndex ? KhaiShopGetInsertIndex(e.clientY) : o.insertIndex;
             o.active && ((KhaiShopSuppressClickUntil = Date.now() + 350), e.preventDefault());
             KhaiShopClearDragState();
-            o.active && null != a && KhaiShopMoveToIndex(o.id, a);
+            o.active &&
+              (ee.log.info(`[listen-test][shop-drag-end] shopId=${o.id}, insertIndex=${a}`),
+              null != a && KhaiShopMoveToIndex(o.id, a));
+          },
+          KhaiShopOnPointerDown = (e) => {
+            const o = KhaiShopGetCard(e.target);
+            if (o && o.setPointerCapture)
+              try {
+                o.setPointerCapture(e.pointerId);
+              } catch (e) {}
+            KhaiShopOnMouseDown(e);
+          },
+          KhaiShopOnPointerMove = (e) => {
+            KhaiShopOnMouseMove(e);
+          },
+          KhaiShopOnPointerUp = (e) => {
+            const o = KhaiShopGetCard(e.target);
+            if (o && o.releasePointerCapture)
+              try {
+                o.releasePointerCapture(e.pointerId);
+              } catch (e) {}
+            KhaiShopOnMouseUp(e);
           },
           KhaiShopOnClick = (e) => {
             Date.now() < KhaiShopSuppressClickUntil && (e.preventDefault(), e.stopPropagation());
           },
           KhaiShopOnDragStart = (e) => {
-            e.preventDefault();
             const o = KhaiShopGetCard(e.target);
             if (!o) return;
             ((KhaiShopDragId = KhaiShopCardId(o)),
               o.classList.add("khai-shop-dragging"),
+              ee.log.info(`[listen-test][shop-native-drag-start] shopId=${KhaiShopDragId}`),
               e.dataTransfer &&
                 ((e.dataTransfer.effectAllowed = "move"),
                 e.dataTransfer.setData("text/plain", String(KhaiShopDragId))));
           },
           KhaiShopOnDragOver = (e) => {
             const o = KhaiShopGetCard(e.target);
-            if (!o || KhaiShopCardId(o) === KhaiShopDragId) return;
+            if (!o || KhaiShopSameId(KhaiShopCardId(o), KhaiShopDragId)) return;
             (e.preventDefault(),
               e.dataTransfer && (e.dataTransfer.dropEffect = "move"),
               document
@@ -983,13 +1009,17 @@ const Ce = A("n-float-button-group"),
             if (!o) return;
             e.preventDefault();
             const a =
-                Number(null == e.dataTransfer ? void 0 : e.dataTransfer.getData("text/plain")) ||
+                (null == e.dataTransfer ? void 0 : e.dataTransfer.getData("text/plain")) ||
                 KhaiShopDragId,
               t = KhaiShopCardId(o);
             (KhaiShopMove(a, t), KhaiShopClearDragState());
           },
           KhaiShopInitDragSort = () => {
             KhaiShopApplyDragAttrs();
+            ee.log.info("[listen-test][shop-drag-init]");
+            document.addEventListener("pointerdown", KhaiShopOnPointerDown, !0);
+            document.addEventListener("pointermove", KhaiShopOnPointerMove, !0);
+            document.addEventListener("pointerup", KhaiShopOnPointerUp, !0);
             document.addEventListener("mousedown", KhaiShopOnMouseDown, !0);
             document.addEventListener("mousemove", KhaiShopOnMouseMove, !0);
             document.addEventListener("mouseup", KhaiShopOnMouseUp, !0);
@@ -1003,7 +1033,10 @@ const Ce = A("n-float-button-group"),
               KhaiShopDragObserver.observe(document.body, { childList: !0, subtree: !0 }));
           },
           KhaiShopDestroyDragSort = () => {
-            (document.removeEventListener("mousedown", KhaiShopOnMouseDown, !0),
+            (document.removeEventListener("pointerdown", KhaiShopOnPointerDown, !0),
+              document.removeEventListener("pointermove", KhaiShopOnPointerMove, !0),
+              document.removeEventListener("pointerup", KhaiShopOnPointerUp, !0),
+              document.removeEventListener("mousedown", KhaiShopOnMouseDown, !0),
               document.removeEventListener("mousemove", KhaiShopOnMouseMove, !0),
               document.removeEventListener("mouseup", KhaiShopOnMouseUp, !0),
               document.removeEventListener("click", KhaiShopOnClick, !0),
@@ -1315,11 +1348,16 @@ const Ce = A("n-float-button-group"),
                                                                   ? "!border-green-500"
                                                                   : "",
                                                               ],
-                                                            ]),
-                                                            size: "small",
-                                                            hoverable: "",
-                                                            onClick: (o) => D(e.id),
-                                                            onContextmenu: (o) => {
+                                                             ]),
+                                                             size: "small",
+                                                             hoverable: "",
+                                                             draggable: !0,
+                                                             onPointerdown: KhaiShopOnPointerDown,
+                                                             onDragstart: KhaiShopOnDragStart,
+                                                             onDragover: KhaiShopOnDragOver,
+                                                             onDrop: KhaiShopOnDrop,
+                                                             onClick: (o) => D(e.id),
+                                                             onContextmenu: (o) => {
                                                               return (
                                                                 (a = o),
                                                                 (t = e),
@@ -1462,10 +1500,14 @@ const Ce = A("n-float-button-group"),
                                                           },
                                                           1032,
                                                           [
-                                                            "id",
-                                                            "class",
-                                                            "onClick",
-                                                            "onContextmenu",
+                                                             "id",
+                                                             "class",
+                                                             "onPointerdown",
+                                                             "onDragstart",
+                                                             "onDragover",
+                                                             "onDrop",
+                                                             "onClick",
+                                                             "onContextmenu",
                                                           ],
                                                         ),
                                                         [

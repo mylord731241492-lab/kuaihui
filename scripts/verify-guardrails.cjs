@@ -8,6 +8,7 @@ const files = {
   message: "app-asar/dist/assets/index-Dk3-oFCm.js",
   todo: "app-asar/dist/assets/index-CBgyFkVF.js",
   todoCss: "app-asar/dist/assets/index-CrXcuUdk.css",
+  appMain: "app-asar/dist/assets/index-CGzMkKvq.js",
   shop: "app-asar/dist/assets/index-wFlC9aUK.js",
 };
 
@@ -42,6 +43,7 @@ function runNodeCheck(rel) {
 runNodeCheck(files.main);
 runNodeCheck(files.message);
 runNodeCheck(files.todo);
+runNodeCheck(files.appMain);
 runNodeCheck(files.shop);
 
 ok("main creates message popup window", has(sources.main, "createMessageWindow("));
@@ -59,6 +61,9 @@ ok("main keeps message resize IPC", has(sources.main, '"resize-message-window"')
 ok("main keeps todo collapse IPC", has(sources.main, '"todoList-collapse"'));
 ok("main keeps todo floating move IPC", has(sources.main, '"move-todo-floating-window"'));
 ok("main hides instead of closing prompt windows", has(sources.main, "setPromptWindowVisible"));
+ok("main has popup listen-test logs", has(sources.main, "[listen-test][popup-toggle]"));
+ok("main has todo listen-test logs", has(sources.main, "[listen-test][todo-collapse]"));
+ok("main has message resize listen-test logs", has(sources.main, "[listen-test][message-resize]"));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
@@ -84,6 +89,13 @@ ok("shop drag uses mouse move", has(sources.shop, "KhaiShopOnMouseMove"));
 ok("shop drag uses mouse up", has(sources.shop, "KhaiShopOnMouseUp"));
 ok("shop drag computes insert index", has(sources.shop, "KhaiShopGetInsertIndex"));
 ok("shop drag saves cache after reorder", has(sources.shop, "saveShopDataToCache"));
+ok("shop drag has listen-test logs", has(sources.shop, "[listen-test][shop-drag-sort]"));
+ok("app main shop cards receive stable ids", has(sources.appMain, "id: `shop-${e.id}`"));
+ok("app main shop drag initializes", has(sources.appMain, "KhaiMainShopInitDragSort()"));
+ok("app main shop drag uses pointer down", has(sources.appMain, "KhaiMainShopOnPointerDown"));
+ok("app main shop drag uses native drag", has(sources.appMain, "KhaiMainShopOnDragStart"));
+ok("app main shop drag saves cache after reorder", has(sources.appMain, "saveShopDataToCache"));
+ok("app main shop drag has listen-test logs", has(sources.appMain, "[listen-test][shop-drag-sort]"));
 
 function moveToIndex(input, id, index) {
   const list = input.slice();

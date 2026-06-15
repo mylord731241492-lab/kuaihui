@@ -48,6 +48,7 @@ const j = { class: "container" },
         E = s(),
         V = o(),
         z = l(!1);
+      Array.isArray(E.aiRepliedMessageList) || (E.aiRepliedMessageList = []);
       (a.on("set-theme", (e, s) => {
         C.changeTheme(s);
       }),
@@ -84,6 +85,7 @@ const j = { class: "container" },
           E.aiRepliedMessageList = E.aiRepliedMessageList.filter((e) => e.shopSystemId !== s);
         }));
       const X = setInterval(() => {
+        Array.isArray(E.aiRepliedMessageList) || (E.aiRepliedMessageList = []);
         E.aiRepliedMessageList.forEach((e) => {
           const s = Math.floor(Date.now() / 1e3),
             a = e.timeout ? e.timeout - s : 100;

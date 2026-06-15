@@ -16,6 +16,7 @@ app-asar/node_modules/
 
 # Local previews and temporary files
 preview/
+test-listens/
 *.log
 *.tmp
 *.bak

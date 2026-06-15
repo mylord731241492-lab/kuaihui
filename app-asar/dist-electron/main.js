@@ -27233,6 +27233,7 @@ ipcMain$1.on(
   "toggle-message-window",
   (e, t) => {
     const { platform: r, show: n } = t;
+    Log.info(`[listen-test][popup-toggle] platform=${r}, show=${n}`);
     switch (r) {
       case "all":
         setPromptWindowVisible(PDDMessageWindow.win, n);
@@ -27256,6 +27257,7 @@ ipcMain$1.on("resize-message-window", (e, t = {}) => {
   if (!PDDMessageWindow.win || PDDMessageWindow.win.isDestroyed())
     return;
   const r = screen.getPrimaryDisplay().workArea, n = PDDMessageWindow.win.getBounds(), s = clampPromptWindowSize(t.width, 320, Math.min(680, r.width - 40)), i = clampPromptWindowSize(t.height, 260, Math.min(900, r.height - 40)), o = clampPromptWindowSize(n.x, r.x, r.x + r.width - s), a = clampPromptWindowSize(n.y, r.y, r.y + r.height - i);
+  Log.info(`[listen-test][message-resize] width=${s}, height=${i}, x=${o}, y=${a}`);
   PDDMessageWindow.win.setBounds({ x: o, y: a, width: s, height: i });
 });
 ipcMain$1.on("todoList-collapse", (e, t) => {
@@ -27263,6 +27265,7 @@ ipcMain$1.on("todoList-collapse", (e, t) => {
     const r = t ? 96 : 420, n = t ? 96 : 283;
     todoListWindow.win.setSize(r, n);
     const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, o = Math.min(Math.max(s.x, i.x), i.x + i.width - r), a = Math.min(Math.max(s.y, i.y), i.y + i.height - n);
+    Log.info(`[listen-test][todo-collapse] collapsed=${t}, width=${r}, height=${n}, x=${o}, y=${a}`);
     todoListWindow.win.setBounds({ x: o, y: a, width: r, height: n }), todoListWindow.win.resizable = !1;
   }, 300));
 });
@@ -27273,6 +27276,7 @@ ipcMain$1.on("move-todo-floating-window", (e, t = {}) => {
   if (r === 0 && n === 0)
     return;
   const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, o = Math.min(Math.max(s.x + r, i.x), i.x + i.width - s.width), a = Math.min(Math.max(s.y + n, i.y), i.y + i.height - s.height);
+  (Math.abs(r) >= 6 || Math.abs(n) >= 6) && Log.info(`[listen-test][todo-move] dx=${r}, dy=${n}, x=${Math.round(o)}, y=${Math.round(a)}`);
   todoListWindow.win.setBounds({ x: Math.round(o), y: Math.round(a), width: s.width, height: s.height });
 });
 function closePromptWindow(e) {
