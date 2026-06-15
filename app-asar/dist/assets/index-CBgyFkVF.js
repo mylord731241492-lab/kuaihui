@@ -102,6 +102,7 @@ const _ = { class: "container" },
           startY: 0,
           lastX: 0,
           lastY: 0,
+          suppressClickUntil: 0,
         },
         W = (e) => {
           e.button === 0 &&
@@ -128,11 +129,14 @@ const _ = { class: "container" },
           }
         },
         te = () => {
-          ((Q.active = !1), window.removeEventListener("mousemove", ee));
+          (Q.moved && (Q.suppressClickUntil = Date.now() + 250),
+            (Q.active = !1),
+            (Q.moved = !1),
+            window.removeEventListener("mousemove", ee));
         },
         se = (e) => {
-          Q.moved
-            ? (e.preventDefault(), e.stopPropagation(), (Q.moved = !1))
+          Date.now() < Q.suppressClickUntil
+            ? (e.preventDefault(), e.stopPropagation())
             : (Z.value = !1);
         };
       s(
