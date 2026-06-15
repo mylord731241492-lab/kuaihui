@@ -1,0 +1,46 @@
+html,
+body,
+#app {
+  background: transparent !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+* {
+  -webkit-app-region: no-drag;
+}
+.n-notification {
+  margin: 0 !important;
+  padding: 5px !important;
+  -webkit-box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 2px 2px 8px #00000026 !important;
+  border: 1px solid #d4d4d4 !important;
+}
+.n-notification .n-notification__avatar {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 16px !important;
+  top: 8px !important;
+  left: 5px !important;
+}
+.n-notification .n-notification-main {
+  margin-left: 20px !important;
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
+}
+.n-notification .n-notification-main .n-notification-main__header {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+.n-notification .n-notification-main .n-notification-main__content {
+  margin-top: 2px !important;
+  font-size: 12px !important;
+  color: #555 !important;
+}
+.n-notification .n-notification__close {
+  margin: 2px 12px !important;
+  font-size: 14px !important;
+}
+[data-v-d0365893] .n-config-provider {
+  background: transparent !important;
+}

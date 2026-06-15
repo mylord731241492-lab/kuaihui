@@ -1,0 +1,27 @@
+directories:
+  output: dist
+  buildResources: build
+appId: com.niushidai.kuaihui.offline.kuaihui
+productName: 快回
+copyright: Copyright © 2025 快茴AI
+asar: true
+win:
+  target:
+    - nsis
+  icon: public/icon.ico
+nsis:
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
+files:
+  - filter:
+      - dist
+      - dist-electron
+      - "!**/win-unpacked"
+publish:
+  - provider: generic
+    url: https://xiaoniukefuzhushou.oss-cn-shenzhen.aliyuncs.com/saas3/
+extraResources:
+  - from: electron/protobuf/protoFile
+    to: protobuf/protoFile
+electronVersion: 34.0.0

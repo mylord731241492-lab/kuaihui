@@ -1,0 +1,140 @@
+.popup-header[data-v-632bdeb8] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: justify;
+  -ms-flex-pack: justify;
+  justify-content: space-between;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  padding: 8px 16px;
+  background: linear-gradient(230deg, #94c0ff, #467efd);
+  border-bottom: 1px solid #e9ecef;
+  color: #e9ecef;
+}
+.popup-header.draggable-area[data-v-632bdeb8] {
+  -webkit-app-region: drag;
+}
+.popup-header .title[data-v-632bdeb8] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  max-width: 200px;
+  overflow: hidden;
+}
+.popup-header .close-button[data-v-632bdeb8] {
+  -webkit-app-region: no-drag;
+  color: #e9ecef;
+}
+.popup-content[data-v-632bdeb8] {
+  height: calc(100vh - 45px);
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: column;
+  flex-direction: column;
+}
+.popup-content .message-list-container[data-v-632bdeb8] {
+  height: 100%;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  width: 100%;
+}
+.popup-content .message-list-container .message-list[data-v-632bdeb8] {
+  padding: 10px;
+  height: calc(100% - 25px);
+  overflow-x: auto;
+}
+.popup-content .message-list-container .message-list[data-v-632bdeb8]::-webkit-scrollbar {
+  width: 6px;
+}
+.popup-content .message-list-container .message-list[data-v-632bdeb8]::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+.popup-content .message-list-container .message-list[data-v-632bdeb8]::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+.popup-content
+  .message-list-container
+  .message-list[data-v-632bdeb8]::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+.popup-content .message-list-container .message-list[data-v-632bdeb8]::-webkit-scrollbar-corner {
+  background: #f1f1f1;
+}
+.popup-content .message-list-container .message-list .message-content[data-v-632bdeb8] {
+  margin-bottom: 10px;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content[data-v-632bdeb8]
+  .n-card-header {
+  padding: 10px;
+  font-size: 14px;
+  color: #333;
+  font-weight: 700;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content[data-v-632bdeb8]
+  .n-card__content {
+  padding: 0 10px 5px;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content
+  .card-header[data-v-632bdeb8] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-pack: justify;
+  -ms-flex-pack: justify;
+  justify-content: space-between;
+  border-bottom: 1px solid #76a7fe;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content
+  .card-header
+  .correction-button[data-v-632bdeb8] {
+  color: #467efd;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content
+  .card-content-item[data-v-632bdeb8] {
+  font-size: 12px;
+}
+.popup-content
+  .message-list-container
+  .message-list
+  .message-content
+  .card-content-item
+  .ai-content[data-v-632bdeb8] {
+  color: #565656;
+}
+.popup-content .message-list-container .message-list-bottom[data-v-632bdeb8] {
+  padding: 5px 10px 10px;
+}

@@ -1,0 +1,33 @@
+{
+  "name": "kuaihui-offline-kuaihui",
+  "author": "快茴AI",
+  "description": "快回",
+  "private": true,
+  "version": "3.6.9",
+  "type": "module",
+  "dependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-vue": "^5.1.12",
+    "axios": "^1.7.2",
+    "better-sqlite3": "^12.8.0",
+    "dayjs": "^1.11.12",
+    "electron-log": "^5.2.0",
+    "electron-store": "^10.0.1",
+    "electron-updater": "^6.3.9",
+    "idb": "^8.0.2",
+    "long": "^5.2.4",
+    "pinia": "^2.2.1",
+    "pinia-plugin-persistedstate": "^3.2.1",
+    "protobufjs": "^7.4.0",
+    "qrcode": "^1.5.4",
+    "redis": "^5.10.0",
+    "terser": "^5.44.0",
+    "tiny-async-pool": "^2.1.0",
+    "uuid": "^10.0.0",
+    "vicons": "^0.0.1",
+    "vue": "^3.5.3",
+    "vue-router": "^4.4.3"
+  },
+  "main": "dist-electron/main.js"
+}

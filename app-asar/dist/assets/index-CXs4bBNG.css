@@ -1,0 +1,68 @@
+body {
+  background-color: transparent !important;
+}
+.ai-button-remark[data-v-7669b252] {
+  background: linear-gradient(314.78deg, #406dff 5.66%, #409eff 93.6%);
+  border: 2px solid #d8e3ff;
+  color: #fff;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  border-radius: 100%;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+  z-index: 20;
+  -webkit-transition: all 0.3s ease;
+  transition: all 0.3s ease;
+  height: 74px;
+  width: 74px !important;
+  -webkit-transform: scale(0.9);
+  transform: scale(0.9);
+}
+.ai-button-remark[data-v-7669b252]:hover {
+  -webkit-transform: scale(1);
+  transform: scale(1);
+}
+#draggable-ai-button[data-v-7669b252] {
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
+}
+#draggable-ai-button .drag-img[data-v-7669b252] {
+  background: url(./icon-SvIzi8O-.png) center center/100% 100%;
+  width: 38px;
+  height: 38px;
+}
+.ai-button-remark[data-v-7669b252] * {
+  pointer-events: auto;
+}
+.dark-switch .n-switch[data-v-3a33d542] .n-switch__rail {
+  background-color: #000e1c;
+}
+.mask[data-v-3a33d542] {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    left bottom,
+    color-stop(20%, #fff),
+    to(hsla(0, 0%, 100%, 0))
+  );
+  background: linear-gradient(180deg, #fff 20%, #fff0);
+  height: 20px;
+  position: absolute;
+  width: 100%;
+}

@@ -1,0 +1,79 @@
+.container {
+  width: 100%;
+  height: 100vh;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-orient: vertical;
+  -webkit-box-direction: normal;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  overflow: hidden;
+}
+.container .header {
+  height: 30px;
+  line-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: linear-gradient(97.03deg, #8a42ff 9.89%, #ff705d 102.13%);
+  color: #fff;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  -webkit-app-region: drag;
+}
+.container .header .refresh-btn {
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.container .item {
+  width: 100%;
+  cursor: pointer;
+  padding: 0 10px;
+  height: 50px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  position: relative;
+}
+.container .item:hover {
+  background-color: #2e333817;
+}
+.container .item.ai-to-human-item {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    right top,
+    from(rgba(255, 112, 93, 0.1)),
+    to(rgba(138, 66, 255, 0.1))
+  );
+  background: linear-gradient(90deg, #ff705d1a, #8a42ff1a);
+  border-left: 3px solid #ff705d;
+}
+.container .item.ai-to-human-item:hover {
+  background: -webkit-gradient(
+    linear,
+    left top,
+    right top,
+    from(rgba(255, 112, 93, 0.2)),
+    to(rgba(138, 66, 255, 0.2))
+  );
+  background: linear-gradient(90deg, #ff705d33, #8a42ff33);
+}
+.container .ai-to-human-badge {
+  background: linear-gradient(97.03deg, #8a42ff 9.89%, #ff705d 102.13%);
+  color: #fff;
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  margin-left: 8px;
+  -ms-flex-negative: 0;
+  flex-shrink: 0;
+  font-weight: 700;
+}
