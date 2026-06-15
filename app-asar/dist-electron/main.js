@@ -27263,8 +27263,7 @@ ipcMain$1.on("resize-message-window", (e, t = {}) => {
 ipcMain$1.on("todoList-collapse", (e, t) => {
   todoListWindow.win && (todoListWindow.win.resizable = !0, setTimeout(() => {
     const r = t ? 96 : 420, n = t ? 96 : 283;
-    todoListWindow.win.setSize(r, n);
-    const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, o = Math.min(Math.max(s.x, i.x), i.x + i.width - r), a = Math.min(Math.max(s.y, i.y), i.y + i.height - n);
+    const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, d = s.x + s.width, o = Math.min(Math.max(d - r, i.x), i.x + i.width - r), a = Math.min(Math.max(s.y, i.y), i.y + i.height - n);
     Log.info(`[listen-test][todo-collapse] collapsed=${t}, width=${r}, height=${n}, x=${o}, y=${a}`);
     todoListWindow.win.setBounds({ x: o, y: a, width: r, height: n }), todoListWindow.win.resizable = !1;
   }, 300));

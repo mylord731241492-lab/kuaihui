@@ -64,6 +64,7 @@ ok("main hides instead of closing prompt windows", has(sources.main, "setPromptW
 ok("main has popup listen-test logs", has(sources.main, "[listen-test][popup-toggle]"));
 ok("main has todo listen-test logs", has(sources.main, "[listen-test][todo-collapse]"));
 ok("main has message resize listen-test logs", has(sources.main, "[listen-test][message-resize]"));
+ok("main keeps todo window right-anchored", has(sources.main, "s.x + s.width") && has(sources.main, "d - r"));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
@@ -80,6 +81,10 @@ ok("todo floating ball has click expand handler", has(sources.todo, "onClick: se
 ok("todo floating ball sends move IPC", has(sources.todo, '"move-todo-floating-window"'));
 ok("todo collapse button exists", has(sources.todo, "todo-collapse-btn"));
 ok("todo floating CSS exists", has(sources.todoCss, ".todo-floating-ball"));
+ok("todo panel has expanded and collapsed states", has(sources.todo, "is-collapsed") && has(sources.todo, "is-expanded"));
+ok("todo expanded panel is solid white", has(sources.todoCss, ".container.is-expanded") && has(sources.todoCss, "background: #ffffff"));
+ok("todo floating ball uses work order icon", has(sources.todoCss, "todo-work-order-icon.png"));
+ok("todo work order icon asset exists", fs.existsSync(path.join(root, "app-asar/dist/assets/todo-work-order-icon.png")));
 
 ok("shop cards receive stable ids", has(sources.shop, "id: `shop-${e.id}`"));
 ok("shop drag initializes on mount", has(sources.shop, "KhaiShopInitDragSort()"));

@@ -203,7 +203,7 @@ const _ = { class: "container" },
               f,
               null,
               [
-                n("div", _, [
+                n("div", { class: ["container", Z.value ? "is-collapsed" : "is-expanded"] }, [
                   p(
                     n(
                       "div",
@@ -216,7 +216,7 @@ const _ = { class: "container" },
                         t[3] ||
                           (t[3] = n(
                             "span",
-                            { class: "todo-floating-title" },
+                            { class: "todo-floating-title", "aria-hidden": "true" },
                             [n("b", null, "处理", -1), n("b", null, "工单", -1)],
                             -1,
                           )),
