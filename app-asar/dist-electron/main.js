@@ -27368,13 +27368,32 @@ ipcMain$1.on("resize-message-window", (e, t = {}) => {
   Log.info(`[listen-test][message-resize] width=${s}, height=${i}, x=${o}, y=${a}`);
   PDDMessageWindow.win.setBounds({ x: o, y: a, width: s, height: i });
 });
+let todoListBoundsAnimationTimer = null;
+const animateTodoListBounds = (e, t, r = 180) => {
+  if (!e || e.isDestroyed())
+    return;
+  todoListBoundsAnimationTimer && (clearInterval(todoListBoundsAnimationTimer), (todoListBoundsAnimationTimer = null));
+  const n = e.getBounds(), s = Date.now(), i = (e) => 1 - Math.pow(1 - e, 3), o = () => {
+    if (!e || e.isDestroyed())
+      return void (todoListBoundsAnimationTimer && (clearInterval(todoListBoundsAnimationTimer), (todoListBoundsAnimationTimer = null)));
+    const a = Math.min(1, (Date.now() - s) / r), d = i(a);
+    e.setBounds({
+      x: Math.round(n.x + (t.x - n.x) * d),
+      y: Math.round(n.y + (t.y - n.y) * d),
+      width: Math.round(n.width + (t.width - n.width) * d),
+      height: Math.round(n.height + (t.height - n.height) * d)
+    });
+    a >= 1 && (clearInterval(todoListBoundsAnimationTimer), (todoListBoundsAnimationTimer = null), e.setBounds(t), (e.resizable = !1));
+  };
+  (e.resizable = !0, o(), (todoListBoundsAnimationTimer = setInterval(o, 16)));
+};
 ipcMain$1.on("todoList-collapse", (e, t) => {
-  todoListWindow.win && (todoListWindow.win.resizable = !0, setTimeout(() => {
+  todoListWindow.win && !todoListWindow.win.isDestroyed() && (() => {
     const r = t ? 96 : 420, n = t ? 96 : 283;
     const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, d = s.x + s.width, o = Math.min(Math.max(d - r, i.x), i.x + i.width - r), a = Math.min(Math.max(s.y, i.y), i.y + i.height - n);
     Log.info(`[listen-test][todo-collapse] collapsed=${t}, width=${r}, height=${n}, x=${o}, y=${a}`);
-    todoListWindow.win.setBounds({ x: o, y: a, width: r, height: n }), todoListWindow.win.resizable = !1;
-  }, 300));
+    animateTodoListBounds(todoListWindow.win, { x: o, y: a, width: r, height: n }, 180);
+  })();
 });
 ipcMain$1.on("move-todo-floating-window", (e, t = {}) => {
   if (!todoListWindow.win || todoListWindow.win.isDestroyed())

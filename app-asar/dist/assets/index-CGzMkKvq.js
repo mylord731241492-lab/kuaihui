@@ -5495,11 +5495,7 @@ const Tl = new (class {
   Zl = { key: 2, ref: "shopListRef", class: "shops-list" },
   Kl = [
     "id",
-    "draggable",
     "onPointerdown",
-    "onDragstart",
-    "onDragover",
-    "onDrop",
     "onClick",
     "onContextmenu",
   ],
@@ -7642,6 +7638,10 @@ const Tl = new (class {
           },
           KhaiMainShopClearDragState = () => {
             KhaiMainShopPointerDrag &&
+              KhaiMainShopPointerDrag.rafId &&
+              (cancelAnimationFrame(KhaiMainShopPointerDrag.rafId),
+              (KhaiMainShopPointerDrag.rafId = 0));
+            KhaiMainShopPointerDrag &&
               KhaiMainShopPointerDrag.card &&
               ((KhaiMainShopPointerDrag.card.style.transform = ""),
               (KhaiMainShopPointerDrag.card.style.zIndex = ""),
@@ -7651,6 +7651,7 @@ const Tl = new (class {
               .forEach((e) => e.classList.remove("khai-main-shop-dragging", "khai-main-shop-drag-over"));
             ((document.body.style.cursor = ""),
               (document.body.style.userSelect = ""),
+              document.body.classList.remove("khai-main-shop-drag-active"),
               (KhaiMainShopDragId = null),
               (KhaiMainShopPointerDrag = null));
           },
@@ -7660,13 +7661,14 @@ const Tl = new (class {
                 const e = document.createElement("style");
                 ((e.id = KhaiMainShopDragStyleId),
                   (e.textContent =
-                    '[id^="shop-"].store-item{cursor:grab;user-select:none;touch-action:none;position:relative}[id^="shop-"].store-item:active{cursor:grabbing}[id^="shop-"].store-item:after{content:"拖动排序";position:absolute;right:14px;top:9px;font-size:11px;color:#6b7280;background:rgba(255,255,255,.88);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:1px 7px;opacity:0;transition:opacity .15s ease;pointer-events:none}[id^="shop-"].store-item:hover:after{opacity:1}.khai-main-shop-dragging{opacity:.82;box-shadow:0 12px 26px rgba(37,99,235,.28)!important;position:relative;z-index:20;pointer-events:none}.khai-main-shop-drag-over{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.22)!important;background:#eff6ff!important}'));
+                    '[id^="shop-"].store-item{cursor:grab;user-select:none;touch-action:none;position:relative;will-change:transform;transition:box-shadow .16s ease,border-color .16s ease,background-color .16s ease}[id^="shop-"].store-item img{-webkit-user-drag:none;user-drag:none}[id^="shop-"].store-item:active{cursor:grabbing}[id^="shop-"].store-item:after{content:"拖动排序";position:absolute;right:14px;top:9px;font-size:11px;color:#6b7280;background:rgba(255,255,255,.88);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:1px 7px;opacity:0;transition:opacity .15s ease;pointer-events:none}[id^="shop-"].store-item:hover:after{opacity:1}body.khai-main-shop-drag-active [id^="shop-"].store-item{transition:none!important}body.khai-main-shop-drag-active [id^="shop-"].store-item:after{transition:none!important}.khai-main-shop-dragging{opacity:.82;box-shadow:0 12px 26px rgba(37,99,235,.28)!important;position:relative;z-index:20;pointer-events:none;will-change:transform;transition:none!important}.khai-main-shop-drag-over{border-color:#2563eb!important;box-shadow:0 0 0 2px rgba(37,99,235,.22)!important;background:#eff6ff!important}'));
                 document.head.appendChild(e);
               })();
             document.querySelectorAll('[id^="shop-"].store-item').forEach((e) => {
-              ((e.draggable = !0),
+              ((e.draggable = !1),
                 e.classList.add("khai-main-shop-draggable"),
-                e.setAttribute("title", "拖动调整店铺排序"));
+                e.setAttribute("title", "拖动调整店铺排序"),
+                e.querySelectorAll("img").forEach((e) => (e.draggable = !1)));
             });
           },
           KhaiMainShopMoveToIndex = (e, t) => {
@@ -7698,6 +7700,14 @@ const Tl = new (class {
                   !KhaiMainShopSameId(KhaiMainShopCardId(e), KhaiMainShopPointerDrag.id)),
             ),
           KhaiMainShopGetInsertIndex = (e) => {
+            const r = KhaiMainShopPointerDrag && KhaiMainShopPointerDrag.rects;
+            if (r && r.length) {
+              let s = null;
+              for (const a of r) {
+                if (((s = a.index), e < a.middle)) return a.index;
+              }
+              return null == s ? null : s + 1;
+            }
             let t = null;
             for (const s of KhaiMainShopGetVisibleCards()) {
               const a = d.shopList.findIndex((e) => KhaiMainShopSameId(e.id, KhaiMainShopCardId(s)));
@@ -7710,15 +7720,51 @@ const Tl = new (class {
           },
           KhaiMainShopIsInteractiveTarget = (e) =>
             Boolean(
-              e &&
+                e &&
                 e.closest &&
-                e.closest("button,input,textarea,select,a,.n-switch,.n-button,.n-dropdown,.shop-logo-clickable"),
+                e.closest("button,input,textarea,select,a,.n-switch,.n-button,.n-dropdown"),
             ),
           KhaiMainShopMarkDragOver = (e) => {
             document
               .querySelectorAll(".khai-main-shop-drag-over")
               .forEach((t) => t !== e && t.classList.remove("khai-main-shop-drag-over"));
             e && e.classList.add("khai-main-shop-drag-over");
+          },
+          KhaiMainShopRunDragFrame = () => {
+            const e = KhaiMainShopPointerDrag;
+            if (!e) return;
+            e.rafId = 0;
+            const t = e.latestX - e.startX,
+              s = e.latestY - e.startY;
+            if (!e.active) {
+              if (Math.abs(t) + Math.abs(s) < 6) return;
+              ((e.active = !0),
+                (KhaiMainShopDragId = e.id),
+                e.card.classList.add("khai-main-shop-dragging"),
+                De.log.info(`[listen-test][shop-drag-start] shopId=${e.id}`),
+                (e.card.style.zIndex = "20"),
+                (e.card.style.pointerEvents = "none"),
+                (e.rects = KhaiMainShopGetVisibleCards()
+                  .map((e) => {
+                    const t = d.shopList.findIndex((t) =>
+                      KhaiMainShopSameId(t.id, KhaiMainShopCardId(e)),
+                    );
+                    if (t < 0) return null;
+                    const s = e.getBoundingClientRect();
+                    return { index: t, middle: s.top + s.height / 2 };
+                  })
+                  .filter(Boolean)),
+                (document.body.style.userSelect = "none"),
+                (document.body.style.cursor = "grabbing"),
+                document.body.classList.add("khai-main-shop-drag-active"));
+            }
+            e.card.style.transform = `translate3d(0, ${s}px, 0)`;
+            const a = KhaiMainShopGetInsertIndex(e.latestY),
+              o = KhaiMainShopGetCard(document.elementFromPoint(e.latestX, e.latestY)),
+              l = o && !KhaiMainShopSameId(KhaiMainShopCardId(o), e.id) ? KhaiMainShopCardId(o) : null;
+            ((e.insertIndex = a),
+              e.overId !== l &&
+                ((e.overId = l), KhaiMainShopMarkDragOver(l ? o : null)));
           },
           KhaiMainShopOnMouseDown = (e) => {
             if (KhaiMainShopPointerDrag) return;
@@ -7730,37 +7776,43 @@ const Tl = new (class {
               id: KhaiMainShopCardId(t),
               startX: e.clientX,
               startY: e.clientY,
+              latestX: e.clientX,
+              latestY: e.clientY,
+              overId: null,
               insertIndex: null,
               active: !1,
               card: t,
+              rafId: 0,
+              rects: null,
+              pointerId: null == e.pointerId ? null : e.pointerId,
             };
           },
           KhaiMainShopOnMouseMove = (e) => {
             if (!KhaiMainShopPointerDrag) return;
+            if (null != KhaiMainShopPointerDrag.pointerId && null == e.pointerId) return;
+            if (
+              null != KhaiMainShopPointerDrag.pointerId &&
+              null != e.pointerId &&
+              e.pointerId !== KhaiMainShopPointerDrag.pointerId
+            )
+              return;
             const t = e.clientX - KhaiMainShopPointerDrag.startX,
               s = e.clientY - KhaiMainShopPointerDrag.startY;
-            if (!KhaiMainShopPointerDrag.active) {
-              if (Math.abs(t) + Math.abs(s) < 6) return;
-              ((KhaiMainShopPointerDrag.active = !0),
-                (KhaiMainShopDragId = KhaiMainShopPointerDrag.id),
-                KhaiMainShopPointerDrag.card.classList.add("khai-main-shop-dragging"),
-                De.log.info(`[listen-test][shop-drag-start] shopId=${KhaiMainShopPointerDrag.id}`),
-                (KhaiMainShopPointerDrag.card.style.zIndex = "20"),
-                (KhaiMainShopPointerDrag.card.style.pointerEvents = "none"),
-                (document.body.style.userSelect = "none"),
-                (document.body.style.cursor = "grabbing"));
-            }
-            e.preventDefault();
-            KhaiMainShopPointerDrag.card.style.transform = `translateY(${s}px)`;
-            const a = KhaiMainShopGetInsertIndex(e.clientY),
-              o = KhaiMainShopGetCard(document.elementFromPoint(e.clientX, e.clientY));
-            ((KhaiMainShopPointerDrag.insertIndex = a),
-              o && !KhaiMainShopSameId(KhaiMainShopCardId(o), KhaiMainShopPointerDrag.id)
-                ? KhaiMainShopMarkDragOver(o)
-                : KhaiMainShopMarkDragOver(null));
+            (KhaiMainShopPointerDrag.active || Math.abs(t) + Math.abs(s) >= 6) &&
+              e.preventDefault();
+            ((KhaiMainShopPointerDrag.latestX = e.clientX),
+              (KhaiMainShopPointerDrag.latestY = e.clientY),
+              KhaiMainShopPointerDrag.rafId ||
+                (KhaiMainShopPointerDrag.rafId =
+                  requestAnimationFrame(KhaiMainShopRunDragFrame)));
           },
           KhaiMainShopOnMouseUp = (e) => {
             if (!KhaiMainShopPointerDrag) return;
+            if (null != KhaiMainShopPointerDrag.pointerId && null == e.pointerId) return;
+            ((KhaiMainShopPointerDrag.latestX = e.clientX),
+              (KhaiMainShopPointerDrag.latestY = e.clientY),
+              KhaiMainShopPointerDrag.rafId &&
+                (cancelAnimationFrame(KhaiMainShopPointerDrag.rafId), KhaiMainShopRunDragFrame()));
             const t = KhaiMainShopPointerDrag,
               s = null == t.insertIndex ? KhaiMainShopGetInsertIndex(e.clientY) : t.insertIndex;
             t.active && ((KhaiMainShopSuppressClickUntil = Date.now() + 350), e.preventDefault());
@@ -7791,63 +7843,25 @@ const Tl = new (class {
           KhaiMainShopOnClick = (e) => {
             Date.now() < KhaiMainShopSuppressClickUntil && (e.preventDefault(), e.stopPropagation());
           },
-          KhaiMainShopOnDragStart = (e) => {
-            const t = KhaiMainShopGetCard(e.target);
-            if (!t) return;
-            ((KhaiMainShopDragId = KhaiMainShopCardId(t)),
-              t.classList.add("khai-main-shop-dragging"),
-              De.log.info(`[listen-test][shop-native-drag-start] shopId=${KhaiMainShopDragId}`),
-              e.dataTransfer &&
-                ((e.dataTransfer.effectAllowed = "move"),
-                e.dataTransfer.setData("text/plain", String(KhaiMainShopDragId))));
-          },
-          KhaiMainShopOnDragOver = (e) => {
-            const t = KhaiMainShopGetCard(e.target);
-            if (!t || KhaiMainShopSameId(KhaiMainShopCardId(t), KhaiMainShopDragId)) return;
-            (e.preventDefault(),
-              e.dataTransfer && (e.dataTransfer.dropEffect = "move"),
-              KhaiMainShopMarkDragOver(t));
-          },
-          KhaiMainShopOnDrop = (e) => {
-            const t = KhaiMainShopGetCard(e.target);
-            if (!t) return;
-            e.preventDefault();
-            const s =
-                (null == e.dataTransfer ? void 0 : e.dataTransfer.getData("text/plain")) ||
-                KhaiMainShopDragId,
-              a = KhaiMainShopCardId(t);
-            (KhaiMainShopMoveToTarget(s, a), KhaiMainShopClearDragState());
-          },
           KhaiMainShopInitDragSort = () => {
             KhaiMainShopApplyDragAttrs();
             De.log.info("[listen-test][shop-drag-init]");
-            document.addEventListener("pointerdown", KhaiMainShopOnPointerDown, !0);
             document.addEventListener("pointermove", KhaiMainShopOnPointerMove, !0);
             document.addEventListener("pointerup", KhaiMainShopOnPointerUp, !0);
-            document.addEventListener("mousedown", KhaiMainShopOnMouseDown, !0);
-            document.addEventListener("mousemove", KhaiMainShopOnMouseMove, !0);
-            document.addEventListener("mouseup", KhaiMainShopOnMouseUp, !0);
+            document.addEventListener("pointercancel", KhaiMainShopClearDragState, !0);
             document.addEventListener("click", KhaiMainShopOnClick, !0);
-            document.addEventListener("dragstart", KhaiMainShopOnDragStart, !0);
-            document.addEventListener("dragover", KhaiMainShopOnDragOver, !0);
-            document.addEventListener("drop", KhaiMainShopOnDrop, !0);
-            document.addEventListener("dragend", KhaiMainShopClearDragState, !0);
           },
           KhaiMainShopDestroyDragSort = () => {
-            (document.removeEventListener("pointerdown", KhaiMainShopOnPointerDown, !0),
-              document.removeEventListener("pointermove", KhaiMainShopOnPointerMove, !0),
+            (document.removeEventListener("pointermove", KhaiMainShopOnPointerMove, !0),
               document.removeEventListener("pointerup", KhaiMainShopOnPointerUp, !0),
-              document.removeEventListener("mousedown", KhaiMainShopOnMouseDown, !0),
-              document.removeEventListener("mousemove", KhaiMainShopOnMouseMove, !0),
-              document.removeEventListener("mouseup", KhaiMainShopOnMouseUp, !0),
+              document.removeEventListener("pointercancel", KhaiMainShopClearDragState, !0),
               document.removeEventListener("click", KhaiMainShopOnClick, !0),
-              document.removeEventListener("dragstart", KhaiMainShopOnDragStart, !0),
-              document.removeEventListener("dragover", KhaiMainShopOnDragOver, !0),
-              document.removeEventListener("drop", KhaiMainShopOnDrop, !0),
-              document.removeEventListener("dragend", KhaiMainShopClearDragState, !0),
               KhaiMainShopClearDragState());
           };
         KhaiMainShopInitDragSort();
+        M(() => {
+          KhaiMainShopDestroyDragSort();
+        });
         (qt("scroll-menu-to-ai-config", async () => {
           var e, t;
           (null == (e = St.value) || e.scrollMenuToAIConfig(),
@@ -8356,16 +8370,8 @@ const Tl = new (class {
                                                                                     ),
                                                                                  },
                                                                                ]),
-                                                                              draggable:
-                                                                                !0,
                                                                               onPointerdown:
                                                                                 KhaiMainShopOnPointerDown,
-                                                                              onDragstart:
-                                                                                KhaiMainShopOnDragStart,
-                                                                              onDragover:
-                                                                                KhaiMainShopOnDragOver,
-                                                                              onDrop:
-                                                                                KhaiMainShopOnDrop,
                                                                                onClick: (t) =>
                                                                                  Nt(e.id),
                                                                               onContextmenu: (

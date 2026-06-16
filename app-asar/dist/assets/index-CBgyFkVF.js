@@ -102,7 +102,23 @@ const _ = { class: "container" },
           startY: 0,
           lastX: 0,
           lastY: 0,
+          pendingDx: 0,
+          pendingDy: 0,
+          rafId: 0,
           suppressClickUntil: 0,
+        },
+        oe = () => {
+          const e = Q.pendingDx,
+            t = Q.pendingDy;
+          ((Q.rafId = 0),
+            (Q.pendingDx = 0),
+            (Q.pendingDy = 0),
+            (0 === e && 0 === t) ||
+              x.postMessage("move-todo-floating-window", { dx: e, dy: t }));
+        },
+        le = (e) => {
+          const t = document.querySelector(".container");
+          t && t.classList.toggle("is-dragging", e);
         },
         W = (e) => {
           e.button === 0 &&
@@ -112,6 +128,10 @@ const _ = { class: "container" },
             (Q.startY = e.screenY),
             (Q.lastX = e.screenX),
             (Q.lastY = e.screenY),
+            (Q.pendingDx = 0),
+            (Q.pendingDy = 0),
+            Q.rafId && (cancelAnimationFrame(Q.rafId), (Q.rafId = 0)),
+            le(!0),
             window.addEventListener("mousemove", ee),
             window.addEventListener("mouseup", te, { once: !0 }),
             e.preventDefault());
@@ -125,13 +145,17 @@ const _ = { class: "container" },
               (Q.lastX = e.screenX),
               (Q.lastY = e.screenY),
               (0 === t && 0 === s) ||
-                x.postMessage("move-todo-floating-window", { dx: t, dy: s }));
+                ((Q.pendingDx += t),
+                (Q.pendingDy += s),
+                Q.rafId || (Q.rafId = requestAnimationFrame(oe))));
           }
         },
         te = () => {
           (Q.moved && (Q.suppressClickUntil = Date.now() + 250),
+            Q.rafId && (cancelAnimationFrame(Q.rafId), oe()),
             (Q.active = !1),
             (Q.moved = !1),
+            le(!1),
             window.removeEventListener("mousemove", ee));
         },
         ae = () => {
@@ -183,6 +207,8 @@ const _ = { class: "container" },
         }),
         a(() => {
           (O && clearInterval(O),
+            Q.rafId && (cancelAnimationFrame(Q.rafId), (Q.rafId = 0)),
+            le(!1),
             window.removeEventListener("mousemove", ee),
             window.removeEventListener("mouseup", te),
             x.removeAllListeners("set-theme"),
@@ -192,6 +218,8 @@ const _ = { class: "container" },
         }),
         l(() => {
           (O && clearInterval(O),
+            Q.rafId && (cancelAnimationFrame(Q.rafId), (Q.rafId = 0)),
+            le(!1),
             window.removeEventListener("mousemove", ee),
             window.removeEventListener("mouseup", te),
             x.removeAllListeners("set-theme"),

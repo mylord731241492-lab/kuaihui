@@ -814,7 +814,8 @@ const ce = new (class {
           await $.deleteAllByShopId(s);
         },
         ps = () => {
-          ((x.value = []), (H.value = []), $.clear());
+          const e = H.value.length;
+          ((x.value = []), (H.value = []), $.clear(), e > 0 && D.send("sync-ai-replied-message-clear"), We());
         },
         cs = (e, s) => {
           const { messageId: t, isAiToHuman: a, shopId: o } = s;
@@ -1116,6 +1117,27 @@ const ce = new (class {
               ((Es.value = !0), ($s.value = e.clientX), (Os.value = e.clientY));
             }));
         },
+        KH_MESSAGE_CLEAR_ONE = (e) => {
+          var s;
+          if (!e || e.messageId === void 0 || e.shopSystemId === void 0) return;
+          const t = e.messageId, a = e.shopSystemId, o = (e) => e.messageId !== t || e.shopSystemId !== a, l = H.value.length, n = x.value.length;
+          ((H.value = H.value.filter(o)),
+            (x.value = x.value.filter(o)),
+            qs(t, a),
+            e.isBottomLineAutoReply && zs(t, a),
+            l !== H.value.length &&
+              D.send("sync-ai-replied-message-remove", {
+                messageId: t,
+                shopSystemId: a,
+              }),
+            n !== x.value.length &&
+              D.postMessage("delete-message", {
+                messageId: t,
+                shopSystemId: a,
+                userId: null == (s = e) ? void 0 : s.userId,
+              }),
+            We());
+        },
         Ps = async (e) => {
           var s;
           if ("ai-to-human" === e) {
@@ -1146,32 +1168,7 @@ const ce = new (class {
                   break;
                 }
             }
-          } else
-            "delete" === e &&
-              void 0 !== Us.value &&
-              ("aiReplied" === B.value
-                ? (qs(Us.value.messageId, Us.value.shopSystemId),
-                  (H.value = H.value.filter(
-                    (e) =>
-                      e.messageId !== Us.value.messageId ||
-                      e.shopSystemId !== Us.value.shopSystemId,
-                  )),
-                  $.delete(at(Us.value.shopSystemId, Us.value.messageId)),
-                  D.send("sync-ai-replied-message-remove", {
-                    messageId: Us.value.messageId,
-                    shopSystemId: Us.value.shopSystemId,
-                  }))
-                : ((x.value = x.value.filter(
-                    (e) =>
-                      e.messageId !== Us.value.messageId ||
-                      e.shopSystemId !== Us.value.shopSystemId,
-                  )),
-                  D.postMessage("delete-message", {
-                    messageId: Us.value.messageId,
-                    shopSystemId: Us.value.shopSystemId,
-                    userId: null == (s = Us.value) ? void 0 : s.userId,
-                  })),
-              We());
+          } else "clear-all" === e ? ps() : "delete" === e && void 0 !== Us.value && KH_MESSAGE_CLEAR_ONE(Us.value);
           Es.value = !1;
         },
         qs = (e, s) => {
@@ -1348,14 +1345,14 @@ const ce = new (class {
               y,
               null,
               [
-                u("div", ge, [
-                  u("div", ve, [
-                    d(
-                      t,
-                      { class: "platform-title", strong: "" },
-                      { default: p(() => [...(s[5] || (s[5] = [c(" 消息通知", -1)]))]), _: 1 },
-                    ),
-                  ]),
+                  u("div", ge, [
+                    u("div", ve, [
+                      d(
+                        t,
+                        { class: "platform-title", strong: "" },
+                        { default: p(() => [...(s[5] || (s[5] = [c(" 消息通知", -1)]))]), _: 1 },
+                      ),
+                    ]),
                   u("div", he, [
                     u("div", ye, [
                       u(
@@ -1963,7 +1960,8 @@ const ce = new (class {
                     x: $s.value,
                     y: Os.value,
                     options: [
-                      { label: "删除", key: "delete" },
+                      { label: "清理当前信息", key: "delete" },
+                      { label: "一键清理全部", key: "clear-all" },
                       { label: Ys.value, key: "ai-to-human" },
                     ],
                     show: Es.value,

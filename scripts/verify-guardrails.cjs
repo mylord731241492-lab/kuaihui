@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, "..");
 const files = {
   main: "app-asar/dist-electron/main.js",
   message: "app-asar/dist/assets/index-Dk3-oFCm.js",
+  messageCss: "app-asar/dist/assets/index-DhfomVSO.css",
   todo: "app-asar/dist/assets/index-CBgyFkVF.js",
   todoCss: "app-asar/dist/assets/index-CrXcuUdk.css",
   appMain: "app-asar/dist/assets/index-CGzMkKvq.js",
@@ -59,6 +60,7 @@ ok("main supports AI missed popup", has(sources.main, 'case "ai-missed":'));
 ok("main supports AI error popup", has(sources.main, 'case "ai-error":'));
 ok("main keeps message resize IPC", has(sources.main, '"resize-message-window"'));
 ok("main keeps todo collapse IPC", has(sources.main, '"todoList-collapse"'));
+ok("main animates todo collapse bounds", has(sources.main, "animateTodoListBounds") && has(sources.main, "todoListBoundsAnimationTimer"));
 ok("main keeps todo floating move IPC", has(sources.main, '"move-todo-floating-window"'));
 ok("main hides instead of closing prompt windows", has(sources.main, "setPromptWindowVisible"));
 ok("main has popup listen-test logs", has(sources.main, "[listen-test][popup-toggle]"));
@@ -77,6 +79,9 @@ ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-messa
 ok("message popup has resize handle", has(sources.message, "khai-message-window-resize-handle"));
 ok("message popup keeps resize command", has(sources.message, '"resize-message-window"'));
 ok("message popup keeps clear/remove AI replied channels", has(sources.message, "clear-ai-replied-message"));
+ok("message popup has right-click clear action", has(sources.message, "清理当前信息") && has(sources.message, "onContextmenu"));
+ok("message popup has one-click clear action", has(sources.message, "一键清理全部") && has(sources.message, "clear-all"));
+ok("message popup clear syncs AI replied messages", has(sources.message, "sync-ai-replied-message-clear"));
 
 ok("todo popup registers itself", has(sources.todo, 'x.send("register-todo-list-window")'));
 ok("todo popup receives todo list", has(sources.todo, '"get-todo-list"'));
@@ -85,11 +90,20 @@ ok("todo popup toggles visibility", has(sources.todo, '"toggle-message-window"')
 ok("todo floating ball has mouse drag handler", has(sources.todo, "onMousedown: W"));
 ok("todo floating ball has click expand handler", has(sources.todo, "onClick: se"));
 ok("todo floating ball sends move IPC", has(sources.todo, '"move-todo-floating-window"'));
+ok("todo floating drag batches moves with animation frame", has(sources.todo, "requestAnimationFrame(oe)"));
+ok("todo floating drag has active drag class", has(sources.todo, "is-dragging") && has(sources.todoCss, ".container.is-dragging .todo-floating-ball"));
 ok("todo collapse button exists", has(sources.todo, "todo-collapse-btn"));
 ok("todo floating CSS exists", has(sources.todoCss, ".todo-floating-ball"));
 ok("todo panel has expanded and collapsed states", has(sources.todo, "is-collapsed") && has(sources.todo, "is-expanded"));
 ok("todo syncs expanded and collapsed classes", has(sources.todo, "classList.toggle(\"is-expanded\""));
 ok("todo expanded panel is solid white", has(sources.todoCss, ".container.is-expanded") && has(sources.todoCss, "background: #ffffff"));
+ok("todo panel has soft open animation", has(sources.todoCss, "todoPanelSoftIn") && has(sources.todoCss, "todoBallSoftIn"));
+ok(
+  "todo floating ball shadows are removed",
+  hasRe(sources.todoCss, /\.container \.todo-floating-ball \{[\s\S]*?box-shadow: none;/) &&
+    hasRe(sources.todoCss, /\.container\.is-dragging \.todo-floating-ball \{[\s\S]*?box-shadow: none;/) &&
+    hasRe(sources.todoCss, /\.container \.todo-floating-ball:hover \{[\s\S]*?box-shadow: none;/),
+);
 ok("todo expanded panel hides floating ball", has(sources.todoCss, ".container.is-expanded .todo-floating-ball") && has(sources.todoCss, "display: none !important"));
 ok("todo collapsed panel hides expanded content", has(sources.todoCss, ".container.is-collapsed .header") && has(sources.todoCss, ".container.is-collapsed .n-scrollbar"));
 ok("todo floating ball uses work order icon", has(sources.todoCss, "todo-work-order-icon.png"));
@@ -98,18 +112,36 @@ ok("todo work order icon asset exists", fs.existsSync(path.join(root, "app-asar/
 ok("shop cards receive stable ids", has(sources.shop, "id: `shop-${e.id}`"));
 ok("shop drag initializes on mount", has(sources.shop, "KhaiShopInitDragSort()"));
 ok("shop drag cleans up on unmount", has(sources.shop, "KhaiShopDestroyDragSort()"));
-ok("shop drag uses mouse down", has(sources.shop, "KhaiShopOnMouseDown"));
-ok("shop drag uses mouse move", has(sources.shop, "KhaiShopOnMouseMove"));
-ok("shop drag uses mouse up", has(sources.shop, "KhaiShopOnMouseUp"));
+ok("shop drag uses pointer down on cards", has(sources.shop, "onPointerdown: KhaiShopOnPointerDown"));
+ok("shop drag uses document pointer move", has(sources.shop, 'document.addEventListener("pointermove", KhaiShopOnPointerMove'));
+ok("shop drag uses document pointer up", has(sources.shop, 'document.addEventListener("pointerup", KhaiShopOnPointerUp'));
+ok("shop drag handles pointer cancel", has(sources.shop, 'document.addEventListener("pointercancel", KhaiShopClearDragState'));
 ok("shop drag computes insert index", has(sources.shop, "KhaiShopGetInsertIndex"));
 ok("shop drag saves cache after reorder", has(sources.shop, "saveShopDataToCache"));
 ok("shop drag has listen-test logs", has(sources.shop, "[listen-test][shop-drag-sort]"));
+ok("shop drag batches pointer moves with animation frame", has(sources.shop, "requestAnimationFrame(KhaiShopRunDragFrame)"));
+ok("shop drag uses GPU translate", has(sources.shop, "translate3d(0,"));
+ok("shop drag disables transitions while active", has(sources.shop, "khai-shop-drag-active"));
+ok("shop drag disables native draggable", has(sources.shop, "e.draggable = !1") && has(sources.shop, "img{-webkit-user-drag:none"));
+ok("shop drag has no native drag/drop handlers", !has(sources.shop, "KhaiShopOnDragStart") && !has(sources.shop, "KhaiShopOnDragOver") && !has(sources.shop, "KhaiShopOnDrop"));
+ok("shop drag has no document mouse/drag sorting listeners", !has(sources.shop, 'document.addEventListener("mousedown", KhaiShopOnMouseDown') && !has(sources.shop, 'document.addEventListener("dragstart", KhaiShop'));
+ok("shop drag throttles mutation reapply", has(sources.shop, "KhaiShopScheduleApplyDragAttrs") && has(sources.shop, "MutationObserver(KhaiShopScheduleApplyDragAttrs)"));
 ok("app main shop cards receive stable ids", has(sources.appMain, "id: `shop-${e.id}`"));
 ok("app main shop drag initializes", has(sources.appMain, "KhaiMainShopInitDragSort()"));
-ok("app main shop drag uses pointer down", has(sources.appMain, "KhaiMainShopOnPointerDown"));
-ok("app main shop drag uses native drag", has(sources.appMain, "KhaiMainShopOnDragStart"));
+ok("app main shop drag cleans up on unmount", has(sources.appMain, "KhaiMainShopDestroyDragSort()") && has(sources.appMain, "KhaiMainShopDestroyDragSort();"));
+ok("app main shop drag uses pointer down on cards", has(sources.appMain, "onPointerdown:\n                                                                                KhaiMainShopOnPointerDown") || has(sources.appMain, "onPointerdown:\r\n                                                                                KhaiMainShopOnPointerDown"));
+ok("app main shop drag uses document pointer move", has(sources.appMain, 'document.addEventListener("pointermove", KhaiMainShopOnPointerMove'));
+ok("app main shop drag uses document pointer up", has(sources.appMain, 'document.addEventListener("pointerup", KhaiMainShopOnPointerUp'));
+ok("app main shop drag handles pointer cancel", has(sources.appMain, 'document.addEventListener("pointercancel", KhaiMainShopClearDragState'));
 ok("app main shop drag saves cache after reorder", has(sources.appMain, "saveShopDataToCache"));
 ok("app main shop drag has listen-test logs", has(sources.appMain, "[listen-test][shop-drag-sort]"));
+ok("app main shop drag batches pointer moves with animation frame", has(sources.appMain, "requestAnimationFrame(KhaiMainShopRunDragFrame)"));
+ok("app main shop drag uses GPU translate", has(sources.appMain, "translate3d(0,"));
+ok("app main shop drag disables transitions while active", has(sources.appMain, "khai-main-shop-drag-active"));
+ok("app main shop drag disables native draggable", has(sources.appMain, "e.draggable = !1") && has(sources.appMain, "img{-webkit-user-drag:none"));
+ok("app main shop drag has no native drag/drop handlers", !has(sources.appMain, "KhaiMainShopOnDragStart") && !has(sources.appMain, "KhaiMainShopOnDragOver") && !has(sources.appMain, "KhaiMainShopOnDrop"));
+ok("app main shop drag has no document mouse/drag sorting listeners", !has(sources.appMain, 'document.addEventListener("mousedown", KhaiMainShopOnMouseDown') && !has(sources.appMain, 'document.addEventListener("dragstart", KhaiMainShop'));
+ok("app main shop avatar can start drag", !has(sources.appMain, 'closest("button,input,textarea,select,a,.n-switch,.n-button,.n-dropdown,.shop-logo-clickable")'));
 
 function moveToIndex(input, id, index) {
   const list = input.slice();
