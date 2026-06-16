@@ -27270,12 +27270,24 @@ const openMessageWindow = () => {
   (!PDDMessageWindow.win || PDDMessageWindow.win.isDestroyed()) && PDDMessageWindow.createMessageWindow("拼多多", e), setPromptWindowVisible(PDDMessageWindow.win, !1), (!aiRepliedMessageWindow.win || aiRepliedMessageWindow.win.isDestroyed()) && aiRepliedMessageWindow.createAiRepliedMessageWindow(), setPromptWindowVisible(aiRepliedMessageWindow.win, !1), (!aiMissedMessageWindow.win || aiMissedMessageWindow.win.isDestroyed()) && aiMissedMessageWindow.createAiMissedMessageWindow(), setPromptWindowVisible(aiMissedMessageWindow.win, !1), (!aiErrorMessageWindow.win || aiErrorMessageWindow.win.isDestroyed()) && aiErrorMessageWindow.createAiErrorMessageWindow(), setPromptWindowVisible(aiErrorMessageWindow.win, !1);
 };
 let popupDebugVisible = !1;
+function getPopupDebugShopSample() {
+  let e = null;
+  return initshoplist.forEach((t) => {
+    !e && t && t.platformType === "拼多多" && (e = t);
+  }), e || {
+    id: 999001,
+    shopName: "调试测试店铺",
+    loginUrl: "",
+    platformLogo: "./assets/todo-work-order-icon.png",
+    platformType: "拼多多"
+  };
+}
 function getPopupDebugSamples() {
-  const e = Math.floor(Date.now() / 1e3), t = "codex-popup-debug-message", r = 999001, n = "调试测试店铺";
+  const e = Math.floor(Date.now() / 1e3), t = "codex-popup-debug-message", r = getPopupDebugShopSample(), n = Number(r.id) || 999001, s = r.shopName || "调试测试店铺", i = r.loginUrl || "", o = r.platformLogo || "./assets/todo-work-order-icon.png";
   return {
     shop: {
-      shopId: r,
-      shopName: n
+      shopId: n,
+      shopName: s
     },
     customerMessage: {
       messageId: t,
@@ -27283,10 +27295,10 @@ function getPopupDebugSamples() {
       username: "调试买家",
       avatar: "",
       content: "这是一条本地调试客服消息，用来测试消息通知弹窗。",
-      shopSystemId: r,
-      shopName: n,
-      loginUrl: "",
-      platformLogo: "./assets/todo-work-order-icon.png",
+      shopSystemId: n,
+      shopName: s,
+      loginUrl: i,
+      platformLogo: o,
       platformType: "拼多多",
       timeout: e + 180
     },
@@ -27298,25 +27310,55 @@ function getPopupDebugSamples() {
       content: "您好，这是一条本地调试 AI 已回复消息。",
       avatar: "",
       isAiToHuman: !1,
-      shopSystemId: r,
-      shopName: n,
-      loginUrl: "",
-      platformLogo: "./assets/todo-work-order-icon.png",
+      shopSystemId: n,
+      shopName: s,
+      loginUrl: i,
+      platformLogo: o,
       platformType: "拼多多",
       shouldShowModal: !0,
       timeout: e + 120
+    },
+    pddRobotCustomerMessage: {
+      messageId: "codex-popup-debug-pdd-robot",
+      userId: "debug-user-pdd-robot",
+      username: "拼多多机器人测试买家",
+      avatar: "",
+      content: "本地模拟：拼多多自带机器人已回复，点击进入会话后这条通知应消失。",
+      shopSystemId: n,
+      shopName: s,
+      loginUrl: i,
+      platformLogo: o,
+      platformType: "拼多多",
+      timeout: e + 240
+    },
+    pddRobotRepliedMessage: {
+      messageId: "codex-popup-debug-pdd-robot",
+      userId: "debug-user-pdd-robot",
+      username: "拼多多机器人测试买家",
+      userQuestion: "本地模拟拼多多机器人回复",
+      content: "您好，我是拼多多商家后台智能助理，这是一条本地模拟机器人回复。",
+      avatar: "",
+      isAiToHuman: !1,
+      isAiAutoReply: !0,
+      shopSystemId: n,
+      shopName: s,
+      loginUrl: i,
+      platformLogo: o,
+      platformType: "拼多多",
+      shouldShowModal: !0,
+      timeout: e + 240
     },
     aiMissedMessage: {
       content: "本地调试：这条买家问题需要人工处理。",
       time: new Date().toLocaleString("zh-CN", { hour12: !1 }),
       shop: {
-        shopName: n,
-        shopId: r
+        shopName: s,
+        shopId: n
       },
       token: "popup-debug-token"
     },
     aiErrorMessage: {
-      shopSystemId: r,
+      shopSystemId: n,
       username: "纠错测试买家",
       userContent: "这个商品有现货吗？",
       content: "本地调试：AI 回复内容待纠错。",
@@ -27324,9 +27366,9 @@ function getPopupDebugSamples() {
       timestring: new Date().toLocaleString("zh-CN", { hour12: !1 })
     },
     todoList: {
-      shopSystemId: r,
-      shopName: n,
-      platformLogo: "./assets/todo-work-order-icon.png",
+      shopSystemId: n,
+      shopName: s,
+      platformLogo: o,
       platformType: "拼多多",
       list: [
         {
@@ -27368,7 +27410,7 @@ function sendPopupDebugPayload(e, t, r, n = 150) {
 }
 function showPopupDebugMode() {
   const e = getPopupDebugSamples();
-  openMessageWindow(), layoutPopupDebugWindows(), [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((t) => setPromptWindowVisible(t, !0)), sendTodoListToWindow(e.todoList), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.customerMessage), sendPopupDebugPayload(aiRepliedMessageWindow.win, "get-ai-replied-message", e.aiRepliedMessage), sendPopupDebugPayload(aiMissedMessageWindow.win, "add-ai-missed-message", e.aiMissedMessage), sendPopupDebugPayload(aiErrorMessageWindow.win, "get-aierror-select-shop", e.shop, 120), sendPopupDebugPayload(aiErrorMessageWindow.win, "add-ai-error-message", e.aiErrorMessage, 220), popupDebugVisible = !0, khaiWriteRuntimeLog("popup-debug", { event: "show", data: { windows: ["message", "todo", "ai", "ai-missed", "ai-error"] } }), Log.info("[popup-debug] show all prompt windows with local samples");
+  openMessageWindow(), layoutPopupDebugWindows(), [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((t) => setPromptWindowVisible(t, !0)), sendTodoListToWindow(e.todoList), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.customerMessage), sendPopupDebugPayload(PDDMessageWindow.win, "get-ai-replied-message-api", e.pddRobotRepliedMessage, 260), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.pddRobotCustomerMessage, 340), sendPopupDebugPayload(aiRepliedMessageWindow.win, "get-ai-replied-message", e.aiRepliedMessage), sendPopupDebugPayload(aiMissedMessageWindow.win, "add-ai-missed-message", e.aiMissedMessage), sendPopupDebugPayload(aiErrorMessageWindow.win, "get-aierror-select-shop", e.shop, 120), sendPopupDebugPayload(aiErrorMessageWindow.win, "add-ai-error-message", e.aiErrorMessage, 220), popupDebugVisible = !0, khaiWriteRuntimeLog("popup-debug", { event: "show", data: { windows: ["message", "todo", "ai", "ai-missed", "ai-error"], pddRobotNotice: !0 } }), Log.info("[popup-debug] show all prompt windows with local samples");
 }
 function hidePopupDebugMode() {
   [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((e) => setPromptWindowVisible(e, !1)), popupDebugVisible = !1, khaiWriteRuntimeLog("popup-debug", { event: "hide" }), Log.info("[popup-debug] hide all prompt windows");

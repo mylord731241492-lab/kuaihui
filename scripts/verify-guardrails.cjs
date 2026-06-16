@@ -78,6 +78,8 @@ ok("main registers popup debug shortcut", has(sources.main, "CommandOrControl+Sh
 ok("main can toggle popup debug mode", has(sources.main, "togglePopupDebugMode"));
 ok("main keeps popup debug local samples", has(sources.main, "getPopupDebugSamples") && has(sources.main, "调试测试店铺"));
 ok("main popup debug shows every popup", has(sources.main, "showPopupDebugMode") && has(sources.main, "add-ai-missed-message") && has(sources.main, "add-ai-error-message") && has(sources.main, "get-customer-message"));
+ok("main popup debug simulates PDD robot notice", has(sources.main, "pddRobotCustomerMessage") && has(sources.main, "pddRobotRepliedMessage") && has(sources.main, '"get-ai-replied-message-api"') && has(sources.main, "本地模拟：拼多多自带机器人"));
+ok("main popup debug binds sample to real PDD shop", has(sources.main, "getPopupDebugShopSample") && has(sources.main, 't.platformType === "拼多多"') && has(sources.main, "Number(r.id)"));
 ok("main popup debug hides prompt windows", has(sources.main, "hidePopupDebugMode") && has(sources.main, "[popup-debug] hide all prompt windows"));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
@@ -88,6 +90,9 @@ ok("message popup keeps clear/remove AI replied channels", has(sources.message, 
 ok("message popup has right-click clear action", has(sources.message, "清理当前信息") && has(sources.message, "onContextmenu"));
 ok("message popup has one-click clear action", has(sources.message, "一键清理全部") && has(sources.message, "clear-all"));
 ok("message popup clear syncs AI replied messages", has(sources.message, "sync-ai-replied-message-clear"));
+ok("message popup clears PDD robot notice after opening chat", has(sources.message, "KH_OPEN_AND_CLEAR_PDD_ROBOT_NOTICE") && has(sources.message, "KH_IS_PDD_ROBOT_NOTICE"));
+ok("message popup PDD robot clear covers all-message and AI lists", has(sources.message, "KH_MESSAGE_CLEAR_ONE(e)") && has(sources.message, '"delete-message"') && has(sources.message, '"sync-ai-replied-message-remove"'));
+ok("message popup logs PDD robot click clear", has(sources.message, "pdd-robot-click-clear") && has(sources.message, '"khai-runtime-log"'));
 
 ok("todo popup registers itself", has(sources.todo, 'x.send("register-todo-list-window")'));
 ok("todo popup receives todo list", has(sources.todo, '"get-todo-list"'));

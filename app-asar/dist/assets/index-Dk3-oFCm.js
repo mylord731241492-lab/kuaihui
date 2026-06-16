@@ -1064,23 +1064,55 @@ const ce = new (class {
           }),
             s.play());
         },
+        KH_MESSAGE_FIND_AI_RECORD = (e) =>
+          e && H.value.find((s) => s.messageId == e.messageId && s.shopSystemId == e.shopSystemId),
+        KH_IS_PDD_ROBOT_NOTICE = (e) => {
+          const s = KH_MESSAGE_FIND_AI_RECORD(e);
+          return (
+            !!e &&
+            "拼多多" === e.platformType &&
+            !(e.isBottomLineAutoReply || (null == s ? void 0 : s.isBottomLineAutoReply)) &&
+            (4 === e.messageType ||
+              !0 === e.isAiAutoReply ||
+              4 === (null == s ? void 0 : s.messageType) ||
+              (!!s && !re(s)))
+          );
+        },
+        KH_MESSAGE_OPEN_PAYLOAD = (e, s) => {
+          const t = {
+            messageId: e.messageId,
+            shopSystemId: e.shopSystemId,
+            username: e.username,
+            userId: e.userId,
+            avatar: e.avatar || "",
+            platformType: e.platformType,
+          };
+          return (s && (t.type = "ai"), t);
+        },
+        KH_MESSAGE_LOG_PDD_ROBOT_CLEAR = (e) => {
+          (D.postMessage("khai-runtime-log", {
+            source: "message-popup",
+            event: "pdd-robot-click-clear",
+            data: {
+              shopSystemId: e.shopSystemId,
+              messageId: e.messageId,
+              messageType: e.messageType,
+              currentTab: B.value,
+              platformType: e.platformType,
+            },
+          }),
+            j.log.info(
+              `[listen-test][pdd-robot-click-clear] shopId=${e.shopSystemId}, messageId=${e.messageId}, tab=${B.value}`,
+            ));
+        },
+        KH_OPEN_AND_CLEAR_PDD_ROBOT_NOTICE = (e) => {
+          const s = KH_IS_PDD_ROBOT_NOTICE(e),
+            t = "aiReplied" === B.value || s;
+          (D.postMessage("click-customer-message", KH_MESSAGE_OPEN_PAYLOAD(e, t)),
+            s && (KH_MESSAGE_LOG_PDD_ROBOT_CLEAR(e), KH_MESSAGE_CLEAR_ONE(e)));
+        },
         Fs = (e) => {
-          "aiReplied" === B.value
-            ? D.postMessage("click-customer-message", {
-                messageId: e.messageId,
-                shopSystemId: e.shopSystemId,
-                userId: e.userId,
-                username: e.username,
-                avatar: e.avatar || "",
-                type: "ai",
-              })
-            : D.postMessage("click-customer-message", {
-                messageId: e.messageId,
-                shopSystemId: e.shopSystemId,
-                username: e.username,
-                userId: e.userId,
-                avatar: e.avatar || "",
-              });
+          KH_OPEN_AND_CLEAR_PDD_ROBOT_NOTICE(e);
         },
         Ns = (e) => {
           ((k.value = "all"), (B.value = "all"));
@@ -1120,7 +1152,7 @@ const ce = new (class {
         KH_MESSAGE_CLEAR_ONE = (e) => {
           var s;
           if (!e || e.messageId === void 0 || e.shopSystemId === void 0) return;
-          const t = e.messageId, a = e.shopSystemId, o = (e) => e.messageId !== t || e.shopSystemId !== a, l = H.value.length, n = x.value.length;
+          const t = e.messageId, a = e.shopSystemId, o = (e) => e.messageId != t || e.shopSystemId != a, l = H.value.length, n = x.value.length;
           ((H.value = H.value.filter(o)),
             (x.value = x.value.filter(o)),
             qs(t, a),
