@@ -20443,6 +20443,9 @@ function initUserProfileStore(e) {
       orderGoodSku TEXT,
       orderAmount TEXT,
       orderStatus TEXT,
+      refundAmount TEXT,
+      afterSaleStatus TEXT,
+      logisticsTrace TEXT,
       orderInfo TEXT,
       orderSn TEXT,
       time INTEGER
@@ -20455,22 +20458,25 @@ function initUserProfileStore(e) {
     { name: "orderGoodSku", type: "TEXT" },
     { name: "orderAmount", type: "TEXT" },
     { name: "orderStatus", type: "TEXT" },
+    { name: "refundAmount", type: "TEXT" },
+    { name: "afterSaleStatus", type: "TEXT" },
+    { name: "logisticsTrace", type: "TEXT" },
     { name: "orderInfo", type: "TEXT" },
     { name: "orderSn", type: "TEXT" },
     { name: "time", type: "INTEGER" }
   ]), SELECT_USER_PROFILE = db$1.prepare(`
     SELECT id, userId, shopId, goodId, orderGoodId, orderGoodSku, orderAmount,
-           orderStatus, orderInfo, orderSn, time
+           orderStatus, refundAmount, afterSaleStatus, logisticsTrace, orderInfo, orderSn, time
     FROM userProfile
     WHERE id = ?
   `), UPSERT_USER_PROFILE = db$1.prepare(`
     INSERT INTO userProfile (
       id, userId, shopId, goodId, orderGoodId, orderGoodSku, orderAmount,
-      orderStatus, orderInfo, orderSn, time
+      orderStatus, refundAmount, afterSaleStatus, logisticsTrace, orderInfo, orderSn, time
     )
     VALUES (
       @id, @userId, @shopId, @goodId, @orderGoodId, @orderGoodSku, @orderAmount,
-      @orderStatus, @orderInfo, @orderSn, @time
+      @orderStatus, @refundAmount, @afterSaleStatus, @logisticsTrace, @orderInfo, @orderSn, @time
     )
     ON CONFLICT(id) DO UPDATE SET
       userId = excluded.userId,
@@ -20480,6 +20486,9 @@ function initUserProfileStore(e) {
       orderGoodSku = excluded.orderGoodSku,
       orderAmount = excluded.orderAmount,
       orderStatus = excluded.orderStatus,
+      refundAmount = excluded.refundAmount,
+      afterSaleStatus = excluded.afterSaleStatus,
+      logisticsTrace = excluded.logisticsTrace,
       orderInfo = excluded.orderInfo,
       orderSn = excluded.orderSn,
       time = excluded.time
@@ -20491,10 +20500,10 @@ function initUserProfileStore(e) {
 function getUserProfile(e, t) {
   if (!e) return null;
   const r = SELECT_USER_PROFILE.get(buildProfileId(e, t));
-  return r ? (r.goodId = normalizeGoodId(r.goodId), r.orderGoodId = normalizeGoodId(r.orderGoodId), r.orderGoodSku = r.orderGoodSku || "", r.orderAmount = r.orderAmount || "", r) : null;
+  return r ? (r.goodId = normalizeGoodId(r.goodId), r.orderGoodId = normalizeGoodId(r.orderGoodId), r.orderGoodSku = r.orderGoodSku || "", r.orderAmount = r.orderAmount || "", r.refundAmount = r.refundAmount || "", r.afterSaleStatus = r.afterSaleStatus || "", r.logisticsTrace = r.logisticsTrace || "", r) : null;
 }
 function mergeUserProfile(e, t) {
-  const r = Date.now(), n = buildProfileId(t.userId, t.shopId), s = normalizeGoodId(t.goodId), i = t.orderStatus || "", o = t.orderInfo || "", a = t.orderSn || "", c = normalizeGoodId(t.orderGoodId), u = t.orderGoodSku || "", l = t.orderAmount != null ? String(t.orderAmount).trim() : "";
+  const r = Date.now(), n = buildProfileId(t.userId, t.shopId), s = normalizeGoodId(t.goodId), i = t.orderStatus || "", o = t.orderInfo || "", a = t.orderSn || "", c = normalizeGoodId(t.orderGoodId), u = t.orderGoodSku || "", l = t.orderAmount != null ? String(t.orderAmount).trim() : "", d = t.refundAmount != null ? String(t.refundAmount).trim() : "", p = t.afterSaleStatus != null ? String(t.afterSaleStatus).trim() : "", f = t.logisticsTrace != null ? String(t.logisticsTrace).trim() : "";
   return e ? detectProfileChange(e, {
     orderSn: a,
     goodId: s,
@@ -20508,6 +20517,9 @@ function mergeUserProfile(e, t) {
     orderGoodSku: u || e.orderGoodSku,
     orderAmount: l || e.orderAmount,
     orderStatus: i || e.orderStatus,
+    refundAmount: d || e.refundAmount,
+    afterSaleStatus: p || e.afterSaleStatus,
+    logisticsTrace: f || e.logisticsTrace,
     orderInfo: o || e.orderInfo,
     orderSn: a || e.orderSn,
     time: r
@@ -20518,6 +20530,9 @@ function mergeUserProfile(e, t) {
     orderGoodId: c || e.orderGoodId,
     orderGoodSku: u || e.orderGoodSku,
     orderAmount: l || e.orderAmount,
+    refundAmount: d || e.refundAmount,
+    afterSaleStatus: p || e.afterSaleStatus,
+    logisticsTrace: f || e.logisticsTrace,
     orderSn: a || e.orderSn,
     orderInfo: o || e.orderInfo
   } : {
@@ -20531,6 +20546,9 @@ function mergeUserProfile(e, t) {
     orderGoodId: c,
     orderGoodSku: u,
     orderAmount: l,
+    refundAmount: d,
+    afterSaleStatus: p,
+    logisticsTrace: f,
     time: r
   };
 }
@@ -22018,6 +22036,140 @@ async function pddPost(e, t) {
     body: JSON.stringify(t)
   })).json();
 }
+function pddPickValue(e, t) {
+  const r = [e], n = /* @__PURE__ */ new Set();
+  for (; r.length; ) {
+    const s = r.shift();
+    if (!s || typeof s != "object" || n.has(s))
+      continue;
+    n.add(s);
+    for (const [i, o] of Object.entries(s)) {
+      if (t.includes(i) && o != null && o !== "")
+        return o;
+      o && typeof o == "object" && r.push(o);
+    }
+  }
+  return "";
+}
+function pddFindArray(e, t) {
+  const r = [e], n = /* @__PURE__ */ new Set();
+  for (; r.length; ) {
+    const s = r.shift();
+    if (!s || typeof s != "object" || n.has(s))
+      continue;
+    n.add(s);
+    for (const [i, o] of Object.entries(s)) {
+      if (Array.isArray(o) && o.length && (!t || t.some((a) => i.toLowerCase().includes(a))))
+        return o;
+      o && typeof o == "object" && r.push(o);
+    }
+  }
+  return [];
+}
+function pddExtractRefundInfo(e) {
+  if (!e)
+    return { refundAmount: "", afterSaleStatus: "" };
+  const t = [
+    "refundAmountStr",
+    "refund_amount_str",
+    "refundFeeStr",
+    "refund_fee_str",
+    "actualRefundAmount",
+    "realRefundAmount",
+    "applyRefundAmount",
+    "afterSalesRefundAmount",
+    "refundAmount",
+    "refund_amount",
+    "refundFee",
+    "refund_fee"
+  ], r = [
+    "afterSaleStatusDesc",
+    "afterSalesStatusDesc",
+    "refundStatusDesc",
+    "serviceStatusDesc",
+    "statusDesc",
+    "afterSaleStatus",
+    "afterSalesStatus",
+    "refundStatus"
+  ];
+  return {
+    refundAmount: pddFormatYuanAmount(pddPickValue(e, t)),
+    afterSaleStatus: String(pddPickValue(e, r) || "").trim()
+  };
+}
+function pddTraceEntryText(e) {
+  if (e == null)
+    return "";
+  if (typeof e == "string")
+    return e.trim();
+  const t = [
+    "time",
+    "timeStr",
+    "ftime",
+    "traceTime",
+    "operateTime",
+    "acceptTime",
+    "createTime",
+    "createdAt"
+  ], r = [
+    "context",
+    "desc",
+    "description",
+    "traceDesc",
+    "statusDesc",
+    "content",
+    "text",
+    "message",
+    "shippingName",
+    "logisticsStateDesc"
+  ], n = String(pddPickValue(e, t) || "").trim(), s = String(pddPickValue(e, r) || "").trim();
+  return `${n} ${s}`.trim();
+}
+function pddExtractTraceList(...e) {
+  for (const t of e) {
+    if (!t)
+      continue;
+    const r = t.traceInfoList || t.trace_info_list || t.logisticsTraceList || t.logistics_trace_list || t.trackingInfoList || t.tracking_info_list || ((n = t.logisticsInfo) == null ? void 0 : n.traceInfoList) || ((s = t.shippingInfo) == null ? void 0 : s.traceInfoList) || pddFindArray(t, ["trace", "logistics", "tracking"]);
+    var n, s;
+    if (Array.isArray(r) && r.length)
+      return r.map(pddTraceEntryText).filter(Boolean).slice(0, 8);
+  }
+  return [];
+}
+async function pddFetchOrderExtraByOrderSn(e, t = null) {
+  const r = { refundAmount: "", afterSaleStatus: "", logisticsTrace: pddExtractTraceList(t).join("\n") };
+  if (!e)
+    return r;
+  try {
+    const n = Math.floor(Date.now() / 1e3), s = n - 365 * 24 * 60 * 60, i = await pddPost(
+      "https://mms.pinduoduo.com/mercury/mms/afterSales/queryList",
+      {
+        pageSize: 10,
+        pageNumber: 1,
+        orderByCreatedAtDesc: !0,
+        mallRemarkStatus: null,
+        mallRemarkTag: null,
+        orderSn: String(e),
+        orderNo: String(e),
+        startCreatedTime: s,
+        endCreatedTime: n
+      }
+    ), o = pddFindArray(i, ["list", "data", "item", "record", "after"]);
+    if (o.length) {
+      const a = o.find((c) => {
+        try {
+          return JSON.stringify(c).includes(String(e));
+        } catch {
+          return !1;
+        }
+      }) || o[0], c = pddExtractRefundInfo(a);
+      r.refundAmount = c.refundAmount, r.afterSaleStatus = c.afterSaleStatus;
+    }
+  } catch (n) {
+    console.warn("[拼多多] 获取订单退款/物流补充信息失败:", n);
+  }
+  return r;
+}
 async function pddFetchLatestOrderByUid(e) {
   var o, a;
   const t = await pddPost(
@@ -22027,13 +22179,16 @@ async function pddFetchLatestOrderByUid(e) {
   if (!t.success || !((a = (o = t.result) == null ? void 0 : o.orders) != null && a.length)) return null;
   const r = t.result.orders[0], n = String(r.orderSn || "");
   if (!n) return null;
-  const s = r.orderGoodsList, i = Array.isArray(s) ? s[0] : s;
+  const s = r.orderGoodsList, i = Array.isArray(s) ? s[0] : s, c = await pddFetchOrderExtraByOrderSn(n, r);
   return {
     orderSn: n,
     orderGoodId: normalizePddGoodId((i == null ? void 0 : i.goodsId) || (i == null ? void 0 : i.goods_id)),
     orderGoodSku: String((i == null ? void 0 : i.spec) || (i == null ? void 0 : i.goods_spec) || "").trim(),
     orderAmount: pddFormatYuanAmount(r.goodsAmount ?? r.orderAmount),
-    orderStatus: String(r.orderStatusStr || "")
+    orderStatus: String(r.orderStatusStr || ""),
+    refundAmount: c.refundAmount,
+    afterSaleStatus: c.afterSaleStatus,
+    logisticsTrace: c.logisticsTrace
   };
 }
 async function pddFetchOrderStatusByUid(e) {
@@ -22091,13 +22246,16 @@ async function pddFetchOrderDetailByOrderSn(e) {
     }
   );
   if (r.success && ((s = (n = r.result) == null ? void 0 : n.pageItems) != null && s.length)) {
-    const i = r.result.pageItems[0];
+    const i = r.result.pageItems[0], o = await pddFetchOrderExtraByOrderSn(e, i);
     return {
       orderSn: e,
       orderGoodId: normalizePddGoodId(i.goods_id),
       orderGoodSku: i.spec || "",
       orderAmount: pddFormatYuanAmount(i.order_amount),
-      orderStatus: String(i.order_status_str || "")
+      orderStatus: String(i.order_status_str || ""),
+      refundAmount: o.refundAmount,
+      afterSaleStatus: o.afterSaleStatus,
+      logisticsTrace: o.logisticsTrace
     };
   }
   return null;
@@ -22713,6 +22871,9 @@ async function runUserProfileWithoutOrder(e, t) {
     orderGoodSku: e.orderGoodSku || "",
     orderAmount: e.orderAmount || "",
     orderStatus: e.orderStatus || "",
+    refundAmount: e.refundAmount || "",
+    afterSaleStatus: e.afterSaleStatus || "",
+    logisticsTrace: e.logisticsTrace || "",
     orderInfo: "",
     orderSn: ""
   };
@@ -22726,7 +22887,7 @@ async function runUserProfileWithoutOrder(e, t) {
     "[runUserProfileWithoutOrder] 首次进线，调用 fetchLatestOrderByUid"
   );
   const s = await t.fetchLatestOrderByUid(r, e);
-  if (console.log("[runUserProfileWithoutOrder] fetchLatestOrderByUid 结果", s), s ? (n.orderSn = s.orderSn, n.orderStatus = s.orderStatus || n.orderStatus, n.orderGoodId = s.orderGoodId || n.orderGoodId, n.orderGoodSku = s.orderGoodSku || n.orderGoodSku, n.orderAmount = s.orderAmount || n.orderAmount) : n.orderStatus = n.orderStatus || "暂无订单", !n.goodId) {
+  if (console.log("[runUserProfileWithoutOrder] fetchLatestOrderByUid 结果", s), s ? (n.orderSn = s.orderSn, n.orderStatus = s.orderStatus || n.orderStatus, n.orderGoodId = s.orderGoodId || n.orderGoodId, n.orderGoodSku = s.orderGoodSku || n.orderGoodSku, n.orderAmount = s.orderAmount || n.orderAmount, n.refundAmount = s.refundAmount || n.refundAmount, n.afterSaleStatus = s.afterSaleStatus || n.afterSaleStatus, n.logisticsTrace = s.logisticsTrace || n.logisticsTrace) : n.orderStatus = n.orderStatus || "暂无订单", !n.goodId) {
     console.log(
       "[runUserProfileWithoutOrder] 无商品ID，调用 fetchConsultGoodId"
     );
@@ -22748,6 +22909,9 @@ async function runUserProfileWithOrder(e, t, r) {
     orderGoodSku: e.orderGoodSku || "",
     orderAmount: e.orderAmount || "",
     orderStatus: e.orderStatus || "",
+    refundAmount: e.refundAmount || "",
+    afterSaleStatus: e.afterSaleStatus || "",
+    logisticsTrace: e.logisticsTrace || "",
     orderInfo: "",
     orderSn: t
   }, o = await r.fetchOrderDetailByOrderSn(
@@ -22755,13 +22919,13 @@ async function runUserProfileWithOrder(e, t, r) {
     e
   );
   if (o)
-    i.orderGoodId = o.orderGoodId || i.orderGoodId, i.orderGoodSku = o.orderGoodSku || i.orderGoodSku, i.orderAmount = o.orderAmount || i.orderAmount, i.orderStatus = o.orderStatus || i.orderStatus;
+    i.orderGoodId = o.orderGoodId || i.orderGoodId, i.orderGoodSku = o.orderGoodSku || i.orderGoodSku, i.orderAmount = o.orderAmount || i.orderAmount, i.orderStatus = o.orderStatus || i.orderStatus, i.refundAmount = o.refundAmount || i.refundAmount, i.afterSaleStatus = o.afterSaleStatus || i.afterSaleStatus, i.logisticsTrace = o.logisticsTrace || i.logisticsTrace;
   else if (e.isFirstVisit) {
     const a = await r.fetchLatestOrderByUid(
       n,
       e
     );
-    a && a.orderSn === t && (i.orderGoodId = i.orderGoodId || a.orderGoodId || "", i.orderGoodSku = i.orderGoodSku || a.orderGoodSku || "", i.orderAmount = i.orderAmount || a.orderAmount || "", i.orderStatus = i.orderStatus || a.orderStatus);
+    a && a.orderSn === t && (i.orderGoodId = i.orderGoodId || a.orderGoodId || "", i.orderGoodSku = i.orderGoodSku || a.orderGoodSku || "", i.orderAmount = i.orderAmount || a.orderAmount || "", i.orderStatus = i.orderStatus || a.orderStatus, i.refundAmount = i.refundAmount || a.refundAmount || "", i.afterSaleStatus = i.afterSaleStatus || a.afterSaleStatus || "", i.logisticsTrace = i.logisticsTrace || a.logisticsTrace || "");
   }
   if (i.goodId = "", !i.goodId) {
     const a = await r.fetchConsultGoodId(
@@ -22806,6 +22970,7 @@ const PLATFORM_FETCH_BINDINGS = {
     fetchOrderStatusByUid: pddFetchOrderStatusByUid,
     fetchOrderStatusByOrderSn: pddFetchOrderStatusByOrderSn,
     fetchOrderDetailByOrderSn: pddFetchOrderDetailByOrderSn,
+    fetchOrderExtraByOrderSn: pddFetchOrderExtraByOrderSn,
     fetchConsultGoodId: pddFetchConsultGoodId
   }`,
   抖店: `{
@@ -22847,6 +23012,12 @@ const PLATFORM_FETCH_BINDINGS = {
       { name: "normalizePddGoodId", fn: normalizePddGoodId },
       { name: "pddFormatYuanAmount", fn: pddFormatYuanAmount },
       { name: "pddPost", fn: pddPost },
+      { name: "pddPickValue", fn: pddPickValue },
+      { name: "pddFindArray", fn: pddFindArray },
+      { name: "pddExtractRefundInfo", fn: pddExtractRefundInfo },
+      { name: "pddTraceEntryText", fn: pddTraceEntryText },
+      { name: "pddExtractTraceList", fn: pddExtractTraceList },
+      { name: "pddFetchOrderExtraByOrderSn", fn: pddFetchOrderExtraByOrderSn },
       { name: "pddFetchLatestOrderByUid", fn: pddFetchLatestOrderByUid },
       { name: "pddFetchOrderStatusByUid", fn: pddFetchOrderStatusByUid },
       {
@@ -23462,6 +23633,9 @@ function extractProfileFromMessage(e, t) {
     orderGoodSku: extractOrderGoodSkuFromMessage(e),
     orderAmount: e.orderAmount != null ? String(e.orderAmount).trim() : "",
     orderStatus: e.orderStatus || "",
+    refundAmount: e.refundAmount != null ? String(e.refundAmount).trim() : "",
+    afterSaleStatus: e.afterSaleStatus != null ? String(e.afterSaleStatus).trim() : "",
+    logisticsTrace: e.logisticsTrace != null ? String(e.logisticsTrace).trim() : "",
     orderInfo: r ? "" : String(e.orderInfo || e.goodInfo || ""),
     orderSn: e.orderId || e.orderSn || ""
   };
@@ -23473,6 +23647,9 @@ function convertProfileToMessageFields(e) {
     orderGoodSku: e.orderGoodSku || "",
     orderAmount: e.orderAmount || "",
     orderStatus: e.orderStatus || "",
+    refundAmount: e.refundAmount || "",
+    afterSaleStatus: e.afterSaleStatus || "",
+    logisticsTrace: e.logisticsTrace || "",
     orderInfo: e.orderInfo || "",
     orderId: e.orderSn || "",
     goodInfo: e.orderInfo || ""
@@ -23499,7 +23676,7 @@ function fillMessageFromCache(e, t) {
   const n = getUserProfile(r, t);
   if (!n) return;
   const s = convertProfileToMessageFields(n), i = !!e.orderId;
-  e.orderStatus = e.orderStatus || s.orderStatus, i || (e.goodId = normalizeGoodId(e.goodId || s.goodId), e.orderInfo = e.orderInfo || s.orderInfo, e.goodInfo = e.goodInfo || s.goodInfo), e.orderGoodId = normalizeGoodId(e.orderGoodId || s.orderGoodId), e.orderGoodSku = e.orderGoodSku || s.orderGoodSku, e.orderAmount = e.orderAmount || s.orderAmount, !e.orderId && s.orderId && (e.orderSn = e.orderSn || s.orderId);
+  e.orderStatus = e.orderStatus || s.orderStatus, e.refundAmount = e.refundAmount || s.refundAmount, e.afterSaleStatus = e.afterSaleStatus || s.afterSaleStatus, e.logisticsTrace = e.logisticsTrace || s.logisticsTrace, i || (e.goodId = normalizeGoodId(e.goodId || s.goodId), e.orderInfo = e.orderInfo || s.orderInfo, e.goodInfo = e.goodInfo || s.goodInfo), e.orderGoodId = normalizeGoodId(e.orderGoodId || s.orderGoodId), e.orderGoodSku = e.orderGoodSku || s.orderGoodSku, e.orderAmount = e.orderAmount || s.orderAmount, !e.orderId && s.orderId && (e.orderSn = e.orderSn || s.orderId);
 }
 function saveMessageProfile(e, t) {
   sanitizeOrderMessageFields(e);
@@ -23508,13 +23685,13 @@ function saveMessageProfile(e, t) {
 }
 function prepareProfileForAI(e, t) {
   const r = e.userId || e.messageId, n = getUserProfile(r, t);
-  e.goodId = (n == null ? void 0 : n.goodId) || e.goodId || "", e.orderGoodId = (n == null ? void 0 : n.orderGoodId) || e.orderGoodId || "", e.orderGoodSku = (n == null ? void 0 : n.orderGoodSku) || e.orderGoodSku || "", e.orderAmount = (n == null ? void 0 : n.orderAmount) || e.orderAmount || "", e.orderStatus = (n == null ? void 0 : n.orderStatus) || e.orderStatus || "暂无订单", e.orderId || (e.goodInfo = (n == null ? void 0 : n.orderInfo) || e.goodInfo || "");
+  e.goodId = (n == null ? void 0 : n.goodId) || e.goodId || "", e.orderGoodId = (n == null ? void 0 : n.orderGoodId) || e.orderGoodId || "", e.orderGoodSku = (n == null ? void 0 : n.orderGoodSku) || e.orderGoodSku || "", e.orderAmount = (n == null ? void 0 : n.orderAmount) || e.orderAmount || "", e.orderStatus = (n == null ? void 0 : n.orderStatus) || e.orderStatus || "暂无订单", e.refundAmount = (n == null ? void 0 : n.refundAmount) || e.refundAmount || "", e.afterSaleStatus = (n == null ? void 0 : n.afterSaleStatus) || e.afterSaleStatus || "", e.logisticsTrace = (n == null ? void 0 : n.logisticsTrace) || e.logisticsTrace || "", e.orderId || (e.goodInfo = (n == null ? void 0 : n.orderInfo) || e.goodInfo || "");
 }
 function applyFetchedProfile(e, t) {
   const r = !!e.orderId;
   if (t.orderGoodId ? e.orderGoodId = normalizeGoodId(t.orderGoodId) : t.goodId && (t.orderSn || r) && (e.orderGoodId = normalizeGoodId(t.goodId)), t.orderGoodSku ? e.orderGoodSku = String(t.orderGoodSku).trim() : t.orderInfo && (e.orderGoodSku = extractOrderGoodSkuFromMessage({
     orderInfo: t.orderInfo
-  })), t.orderAmount != null && t.orderAmount !== "" && (e.orderAmount = String(t.orderAmount).trim()), t.orderStatus && (e.orderStatus = t.orderStatus), t.orderSn && (e.orderSn = t.orderSn, r && (e.orderId = t.orderSn)), r && sanitizeOrderMessageFields(e), t.goodId) {
+  })), t.orderAmount != null && t.orderAmount !== "" && (e.orderAmount = String(t.orderAmount).trim()), t.orderStatus && (e.orderStatus = t.orderStatus), t.refundAmount != null && t.refundAmount !== "" && (e.refundAmount = String(t.refundAmount).trim()), t.afterSaleStatus != null && t.afterSaleStatus !== "" && (e.afterSaleStatus = String(t.afterSaleStatus).trim()), t.logisticsTrace != null && t.logisticsTrace !== "" && (e.logisticsTrace = String(t.logisticsTrace).trim()), t.orderSn && (e.orderSn = t.orderSn, r && (e.orderId = t.orderSn)), r && sanitizeOrderMessageFields(e), t.goodId) {
     const n = normalizeGoodId(t.goodId), s = normalizeGoodId(e.orderGoodId);
     (!s || n !== s) && (e.goodId = n);
   }
@@ -23574,7 +23751,10 @@ async function ensureUserProfile(e, t, r, n) {
       goodId: e.goodId,
       orderGoodId: e.orderGoodId,
       orderGoodSku: e.orderGoodSku,
-      orderAmount: e.orderAmount
+      orderAmount: e.orderAmount,
+      refundAmount: e.refundAmount,
+      afterSaleStatus: e.afterSaleStatus,
+      hasLogisticsTrace: !!e.logisticsTrace
     }
   }), !c || !["拼多多", "抖店", "快手", "视频号", "小红书"].includes(r) || !n || n.isDestroyed())
     return e;
@@ -23586,6 +23766,9 @@ async function ensureUserProfile(e, t, r, n) {
     orderGoodSku: e.orderGoodSku ? String(e.orderGoodSku) : "",
     orderAmount: e.orderAmount ? String(e.orderAmount) : "",
     orderStatus: e.orderStatus ? String(e.orderStatus) : "",
+    refundAmount: e.refundAmount ? String(e.refundAmount) : "",
+    afterSaleStatus: e.afterSaleStatus ? String(e.afterSaleStatus) : "",
+    logisticsTrace: e.logisticsTrace ? String(e.logisticsTrace) : "",
     orderInfo: e.orderInfo ? String(e.orderInfo) : "",
     mode: e.source === "code1" ? "push" : "ordinary",
     refreshType: toExecJsRefreshType(detectProfileChange(o, l)),
@@ -23661,7 +23844,10 @@ function buildAiOrderInfo(e) {
     orderStatus: e.orderStatus || "",
     orderGoodId: e.orderGoodId || "",
     orderGoodSku: e.orderGoodSku || "",
-    orderAmount: e.orderAmount != null ? String(e.orderAmount).trim() : ""
+    orderAmount: e.orderAmount != null ? String(e.orderAmount).trim() : "",
+    refundAmount: e.refundAmount != null ? String(e.refundAmount).trim() : "",
+    afterSaleStatus: e.afterSaleStatus != null ? String(e.afterSaleStatus).trim() : "",
+    logisticsTrace: e.logisticsTrace != null ? String(e.logisticsTrace).trim() : ""
   });
 }
 const queueList = /* @__PURE__ */ new Map(), quicklyList = /* @__PURE__ */ new Map(), shopToDo = /* @__PURE__ */ new Map(), messageBuffer = /* @__PURE__ */ new Map(), Fast = /* @__PURE__ */ new Set(), plainList = /* @__PURE__ */ new Set(), shopTimeout = /* @__PURE__ */ new Map(), msgTimeout = /* @__PURE__ */ new Map(), threeMessageEqualForUser = /* @__PURE__ */ new Map(), userOperatingShops = /* @__PURE__ */ new Map(), noledgeCache = /* @__PURE__ */ new Map(), maxConcurrency = 5, messageIsOpenCache = /* @__PURE__ */ new Map(), processedMessagesCache = /* @__PURE__ */ new Map(), isUserOperating = /* @__PURE__ */ new Map(), userHistorical = /* @__PURE__ */ new Map(), operatingWaiter = createWaiter(5e3), historicalWaiter = createWaiter(8e3);
@@ -41771,7 +41957,7 @@ app$1.whenReady().then(async () => {
   });
   setTimeout(() => {
     Log.info("离线测试模式：跳过更新检测");
-  }, 2e3), ipcMain$1.on("update-retry", () => {
+  }, 2e3), setupPddAftersaleDetailMonitor(), ipcMain$1.on("update-retry", () => {
     t.checkForUpdates(!0);
   }), setupRequestInterceptor(), ipcMain$1.on("set-bottom-line-reply-global", (i, o) => {
     const a = setGlobalBottomLineReplyConfig(o);
@@ -41861,6 +42047,211 @@ app$1.on("child-process-gone", (e, t) => {
   var r;
   Log.error(`子进程崩溃: ${JSON.stringify(t)}`), console.log(`子进程崩溃: ${JSON.stringify(t)}`), (r = PDDMessageWindow == null ? void 0 : PDDMessageWindow.win) == null || r.webContents.send("reported-messagelist");
 });
+const khaiPddAftersaleDetailMonitorState = /* @__PURE__ */ new Map();
+let khaiPddAftersaleDetailMonitorTimer = null;
+function khaiBuildPddAftersaleDetailMonitorScript() {
+  return `(() => {
+    if (!location.href.includes("mms.pinduoduo.com/aftersales-ssr/detail")) return null;
+    const textOf = (el) => (el && (el.innerText || el.textContent) || "").replace(/\\r/g, "").trim();
+    const bodyText = textOf(document.body);
+    const lines = bodyText.split(/\\n+/).map((line) => line.trim()).filter(Boolean);
+    const orderSn = new URL(location.href).searchParams.get("orderSn") || (bodyText.match(/订单编号[:：]?\\s*([0-9-]+)/) || [])[1] || "";
+    if (!orderSn) return null;
+    const expressBox = document.querySelector("#detail-express-box");
+    if (expressBox) {
+      Array.from(expressBox.querySelectorAll("button,a,span,div")).forEach((el) => {
+        const text = textOf(el);
+        if (text === "查看全部" && !el.__khaiPddClickedViewAll) {
+          el.__khaiPddClickedViewAll = true;
+          try { el.click(); } catch (err) {}
+        }
+      });
+    }
+    const readNextValue = (labels, startIndex = 0) => {
+      for (let i = startIndex; i < lines.length; i++) {
+        const line = lines[i];
+        for (const label of labels) {
+          if (line === label || line === label + "：" || line === label + ":") {
+            for (let j = i + 1; j < lines.length; j++) {
+              if (!lines[j] || lines[j] === "复制" || lines[j] === "-") continue;
+              return lines[j];
+            }
+          }
+          if (line.startsWith(label + "：") || line.startsWith(label + ":")) {
+            const value = line.replace(new RegExp("^" + label + "[：:]\\\\s*"), "").trim();
+            if (value) return value;
+          }
+        }
+      }
+      return "";
+    };
+    const normalizeMoney = (value) => {
+      const raw = String(value || "").replace(/\\s+/g, "").trim();
+      const match = raw.match(/[￥¥]?\\d+(?:\\.\\d{1,2})?/);
+      return match ? match[0].replace(/^¥/, "￥") : "";
+    };
+    const refundAmount = normalizeMoney(readNextValue(["退款金额"]));
+    const afterSaleType = readNextValue(["售后类型"]);
+    let afterSaleStatus = "";
+    const statusIndex = lines.findIndex((line) => line === "售后状态" || line === "售后状态：" || line === "售后状态:");
+    if (statusIndex >= 0) {
+      for (let i = statusIndex + 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^(退款金额|协商详情|聊天记录|联系消费者|备注|订单权益|物流轨迹)/.test(line)) break;
+        if (/如何降低|查看整改建议|平台邀请|本单商品/.test(line)) continue;
+        if (/(退款|退货|成功|关闭|处理中|驳回|同意|拒绝)/.test(line)) {
+          afterSaleStatus = line;
+          break;
+        }
+      }
+    }
+    if (!afterSaleStatus) afterSaleStatus = (bodyText.match(/售后状态[:：]?\\s*([^\\n]{1,50})/) || [])[1] || "";
+    if (afterSaleType && afterSaleStatus && !afterSaleStatus.includes(afterSaleType)) afterSaleStatus = afterSaleType + "，" + afterSaleStatus;
+    if (!afterSaleStatus) afterSaleStatus = afterSaleType;
+    const cleanLine = (line) => String(line || "").trim();
+    const isTime = (line) => /^\\d{4}[-/]\\d{2}[-/]\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}$/.test(line);
+    const isTraceDetail = (line) =>
+      line &&
+      !isTime(line) &&
+      !/^(查看全部|复制|物流轨迹|新疆中转|中转仓|消费者|商家|快递电话|备注|订单备注由商家添加|修改备注|标记红色)$/.test(line) &&
+      !/^[一二三四五六七八九十]+段物流$/.test(line) &&
+      !/^快递信息[:：]/.test(line) &&
+      !/^快递电话[:：]/.test(line) &&
+      /(包裹|快件|物流|快递|签收|发货|揽收|派件|中转|目的地|已到达|已离开|已送达|已验收|已收取|商家已发货)/.test(line);
+    const parseTrace = (sourceText) => {
+      const sourceLines = String(sourceText || "").replace(/\\r/g, "").split(/\\n+/).map(cleanLine).filter(Boolean);
+      const entries = [];
+      for (let i = 0; i < sourceLines.length; i++) {
+        if (!isTime(sourceLines[i])) continue;
+        let detail = "";
+        for (let j = i - 1; j >= 0 && j >= i - 6; j--) {
+          if (isTraceDetail(sourceLines[j])) {
+            detail = sourceLines[j];
+            break;
+          }
+        }
+        if (!detail) {
+          for (let j = i + 1; j < sourceLines.length && j <= i + 6; j++) {
+            if (isTraceDetail(sourceLines[j])) {
+              detail = sourceLines[j];
+              break;
+            }
+          }
+        }
+        if (detail) entries.push(detail + "\\n" + sourceLines[i]);
+      }
+      return Array.from(new Set(entries)).slice(0, 20).join("\\n\\n");
+    };
+    let traceText = expressBox ? textOf(expressBox) : "";
+    if (!traceText) {
+      const start = bodyText.indexOf("物流轨迹");
+      if (start >= 0) {
+        const endCandidates = ["备注", "售后状态", "协商详情"].map((key) => bodyText.indexOf(key, start + 4)).filter((idx) => idx > start);
+        const end = endCandidates.length ? Math.min(...endCandidates) : start + 4000;
+        traceText = bodyText.slice(start, end);
+      }
+    }
+    const logisticsTrace = parseTrace(traceText);
+    const data = {
+      orderSn,
+      afterSaleStatus,
+      refundAmount,
+      logisticsTrace,
+      traceCount: logisticsTrace ? logisticsTrace.split(/\\n\\n+/).length : 0
+    };
+    const escapeHtml = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+    const ensureStyle = () => {
+      if (document.getElementById("khai-pdd-order-extra-style")) return;
+      const style = document.createElement("style");
+      style.id = "khai-pdd-order-extra-style";
+      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:86px;right:36px;width:420px;max-width:calc(100vw - 72px);max-height:68vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:13px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16)}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:4px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:5px;padding:8px 10px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:230px;overflow:auto}";
+      document.head.appendChild(style);
+    };
+    const render = () => {
+      ensureStyle();
+      let panel = document.getElementById("khai-pdd-order-extra-panel");
+      if (!panel) {
+        panel = document.createElement("div");
+        panel.id = "khai-pdd-order-extra-panel";
+      }
+      panel.innerHTML = '<div class="khai-order-extra-title"><span>快回检测到售后状态</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "正在监听物流轨迹，点开右侧“查看全部”后会继续更新") + '</div></div>';
+      panel.querySelector(".khai-order-extra-close")?.addEventListener("click", () => panel.remove());
+      document.body.appendChild(panel);
+    };
+    render();
+    return data;
+  })()`;
+}
+function khaiBuildPddOrderExtraRenderScript(e) {
+  const t = JSON.stringify(e || {}).replace(/`/g, "\\`").replace(/\$\\{/g, "\\${");
+  return `(() => {
+    const data = ${t};
+    if (!data || !data.orderSn) return false;
+    const currentText = document.body && (document.body.innerText || document.body.textContent || "") || "";
+    const existing = document.getElementById("khai-pdd-order-extra-panel");
+    if (!currentText.includes(data.orderSn) && !(existing && (existing.innerText || "").includes(data.orderSn))) return false;
+    const escapeHtml = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+    if (!document.getElementById("khai-pdd-order-extra-style")) {
+      const style = document.createElement("style");
+      style.id = "khai-pdd-order-extra-style";
+      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:118px;right:390px;width:390px;max-width:calc(100vw - 430px);max-height:62vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:12px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16)}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:3px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:4px;padding:6px 8px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:180px;overflow:auto}";
+      document.head.appendChild(style);
+    }
+    let panel = existing || document.createElement("div");
+    panel.id = "khai-pdd-order-extra-panel";
+    panel.innerHTML = '<div class="khai-order-extra-title"><span>快回检测到售后状态</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "暂无物流轨迹") + '</div></div>';
+    panel.querySelector(".khai-order-extra-close")?.addEventListener("click", () => panel.remove());
+    document.body.appendChild(panel);
+    return true;
+  })()`;
+}
+async function khaiBroadcastPddAftersaleDetail(e, t) {
+  if (!e || !e.orderSn) return;
+  const r = khaiBuildPddOrderExtraRenderScript(e);
+  for (const n of webContents.getAllWebContents()) {
+    if (!n || n.isDestroyed() || n.id === t) continue;
+    const s = n.getURL();
+    if (!s.includes("mms.pinduoduo.com/chat-merchant")) continue;
+    try {
+      await n.executeJavaScript(r, true);
+    } catch (i) {}
+  }
+}
+async function khaiPollPddAftersaleDetailPages() {
+  const e = khaiBuildPddAftersaleDetailMonitorScript();
+  for (const t of webContents.getAllWebContents()) {
+    if (!t || t.isDestroyed()) continue;
+    const r = t.getURL();
+    if (!r.includes("mms.pinduoduo.com/aftersales-ssr/detail")) continue;
+    const n = khaiPddAftersaleDetailMonitorState.get(t.id) || {};
+    if (n.running) continue;
+    n.running = true;
+    khaiPddAftersaleDetailMonitorState.set(t.id, n);
+    try {
+      const s = await t.executeJavaScript(e, true);
+      if (s && s.orderSn) {
+        const i = [s.orderSn, s.afterSaleStatus, s.refundAmount, s.traceCount, String(s.logisticsTrace || "").length].join("|");
+        i !== n.lastSignature && (n.lastSignature = i, khaiWriteRuntimeLog("pdd-aftersale-detail", { event: "sync", data: { orderSnTail: String(s.orderSn).slice(-6), afterSaleStatus: s.afterSaleStatus || "", refundAmount: s.refundAmount || "", traceCount: s.traceCount || 0, hasLogisticsTrace: !!s.logisticsTrace } }));
+        await khaiBroadcastPddAftersaleDetail(s, t.id);
+      }
+    } catch (s) {
+      khaiWriteRuntimeLog("pdd-aftersale-detail", { event: "sync-error", level: "warn", data: { webContentsId: t.id, message: s == null ? void 0 : s.message } });
+    } finally {
+      n.running = false;
+      khaiPddAftersaleDetailMonitorState.set(t.id, n);
+    }
+  }
+}
+function setupPddAftersaleDetailMonitor() {
+  if (khaiPddAftersaleDetailMonitorTimer) return;
+  khaiPddAftersaleDetailMonitorTimer = setInterval(() => {
+    khaiPollPddAftersaleDetailPages().catch((e) => {
+      khaiWriteRuntimeLog("pdd-aftersale-detail", { event: "poll-error", level: "warn", data: { message: e == null ? void 0 : e.message } });
+    });
+  }, 2e3);
+  khaiPddAftersaleDetailMonitorTimer.unref && khaiPddAftersaleDetailMonitorTimer.unref();
+  khaiWriteRuntimeLog("pdd-aftersale-detail", { event: "monitor-start" });
+}
 function setupRequestInterceptor() {
   const offlineBlockFilter = {
     urls: [

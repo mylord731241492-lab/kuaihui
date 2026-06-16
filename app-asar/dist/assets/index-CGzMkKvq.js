@@ -2230,6 +2230,9 @@ const aa = a({
   Fa = { style: { "padding-left": "10px" } },
   $a = { key: 0, class: "receiver-info-content" },
   Ha = { key: 1, class: "receiver-info-content" },
+  KHAI_PDD_REFUND_ROW = { key: 2, class: "receiver-info-content order-refund-content" },
+  KHAI_PDD_TRACE_ROW = { key: 3, class: "receiver-info-content order-logistics-content" },
+  KHAI_PDD_TRACE_TEXT = { class: "order-logistics-trace" },
   Va = { style: { display: "flex", "align-items": "start" } },
   qa = { style: { display: "grid", "grid-template-columns": "1fr" } },
   Ja = Le(
@@ -2743,6 +2746,72 @@ const aa = a({
                                                                                 1,
                                                                               ),
                                                                             ]))
+                                                                          : y("", !0),
+                                                                        e.refundAmount ||
+                                                                        e.afterSaleStatus
+                                                                          ? (g(),
+                                                                            v(
+                                                                              "p",
+                                                                              KHAI_PDD_REFUND_ROW,
+                                                                              [
+                                                                                t[80] ||
+                                                                                  (t[80] = m(
+                                                                                    "span",
+                                                                                    {
+                                                                                      class:
+                                                                                        "order-title",
+                                                                                    },
+                                                                                    "退款信息：",
+                                                                                    -1,
+                                                                                  )),
+                                                                                C(
+                                                                                  " " +
+                                                                                    x(
+                                                                                      e.refundAmount ||
+                                                                                        "未获取到金额",
+                                                                                    ) +
+                                                                                    x(
+                                                                                      e.afterSaleStatus
+                                                                                        ? " " +
+                                                                                            e.afterSaleStatus
+                                                                                        : "",
+                                                                                    ),
+                                                                                  1,
+                                                                                ),
+                                                                              ],
+                                                                            ))
+                                                                          : y("", !0),
+                                                                        e.logisticsTrace
+                                                                          ? (g(),
+                                                                            v(
+                                                                              "p",
+                                                                              KHAI_PDD_TRACE_ROW,
+                                                                              [
+                                                                                t[81] ||
+                                                                                  (t[81] = m(
+                                                                                    "span",
+                                                                                    {
+                                                                                      class:
+                                                                                        "order-title",
+                                                                                    },
+                                                                                    "物流轨迹：",
+                                                                                    -1,
+                                                                                  )),
+                                                                                t[82] ||
+                                                                                  (t[82] = m(
+                                                                                    "br",
+                                                                                    null,
+                                                                                    null,
+                                                                                    -1,
+                                                                                  )),
+                                                                                m(
+                                                                                  "span",
+                                                                                  KHAI_PDD_TRACE_TEXT,
+                                                                                  x(e.logisticsTrace),
+                                                                                  1,
+                                                                                ),
+                                                                              ],
+                                                                            ))
                                                                           : y("", !0),
                                                                         e.name && e.address
                                                                           ? (g(),

@@ -2563,6 +2563,9 @@ const bs = () => {
     );
     -1 !== t &&
       ((Us.value[t].orderStatus = e.orderStatus),
+      e.refundAmount && (Us.value[t].refundAmount = e.refundAmount),
+      e.afterSaleStatus && (Us.value[t].afterSaleStatus = e.afterSaleStatus),
+      e.logisticsTrace && (Us.value[t].logisticsTrace = e.logisticsTrace),
       st.postMessage({ type: "update-customer-message", data: JSON.stringify(Us.value[t]) }));
   },
   _s = async (e) => {

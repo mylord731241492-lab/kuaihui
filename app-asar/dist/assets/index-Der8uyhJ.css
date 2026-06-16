@@ -247,6 +247,19 @@
 .order-content .receiver-info-content[data-v-d26e28ac] {
   font-size: 12px;
 }
+.order-content .order-refund-content[data-v-d26e28ac] {
+  color: #dc2626;
+}
+.order-content .order-logistics-content[data-v-d26e28ac] {
+  color: #374151;
+}
+.order-content .order-logistics-trace[data-v-d26e28ac] {
+  display: block;
+  padding-left: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #4b5563;
+}
 .order-content .order-title[data-v-d26e28ac] {
   font-weight: 700;
 }
