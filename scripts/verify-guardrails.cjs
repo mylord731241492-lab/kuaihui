@@ -66,6 +66,12 @@ ok("main hides instead of closing prompt windows", has(sources.main, "setPromptW
 ok("main has popup listen-test logs", has(sources.main, "[listen-test][popup-toggle]"));
 ok("main has todo listen-test logs", has(sources.main, "[listen-test][todo-collapse]"));
 ok("main has message resize listen-test logs", has(sources.main, "[listen-test][message-resize]"));
+ok("main has unified runtime log file", has(sources.main, "khai-runtime") && has(sources.main, "KHAI_RUNTIME_LOG_DATE"));
+ok("main has runtime log IPC", has(sources.main, '"khai-runtime-log"') && has(sources.main, "khaiWriteRuntimeLog"));
+ok("main masks sensitive runtime log fields", has(sources.main, "KHAI_RUNTIME_SECRET_RE") && has(sources.main, "[redacted]"));
+ok("main forwards renderer listen-test logs", has(sources.main, "forwarded-log") && has(sources.main, "[listen-test]"));
+ok("main logs account and shop persistence", has(sources.main, 'event: "save-login-data"') && has(sources.main, 'event: "save-shop-data"') && has(sources.main, "khaiRuntimeShopCount"));
+ok("main logs popup and todo runtime actions", has(sources.main, 'event: "toggle-message-window"') && has(sources.main, 'event: "collapse"') && has(sources.main, 'event: "move-floating-window"'));
 ok("main keeps todo window right-anchored", has(sources.main, "s.x + s.width") && has(sources.main, "d - r"));
 ok("main creates todo floating ball near right edge", has(sources.main, "t.x + t.width - r - 24"));
 ok("main registers popup debug shortcut", has(sources.main, "CommandOrControl+Shift+Home"));

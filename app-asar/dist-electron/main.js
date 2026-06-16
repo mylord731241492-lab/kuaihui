@@ -13016,8 +13016,46 @@ const getSystemInfo = () => ({
     );
   }
 };
+const KHAI_RUNTIME_LOG_DATE = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), khaiRuntimeLog = thatLog.create("khai-runtime");
+khaiRuntimeLog.transports.file.fileName = `khai-runtime-${KHAI_RUNTIME_LOG_DATE}.log`;
+khaiRuntimeLog.transports.file.maxSize = 5242880;
+const KHAI_RUNTIME_SECRET_RE = /token|cookie|password|passwd|authorization|secret|session|access[_-]?key|refresh[_-]?token/i;
+function khaiSafeLogValue(e, t = 0, r = /* @__PURE__ */ new WeakSet()) {
+  if (e instanceof Error)
+    return { name: e.name, message: e.message, stack: String(e.stack || "").slice(0, 1200) };
+  if (e == null || typeof e == "number" || typeof e == "boolean")
+    return e;
+  if (typeof e == "string")
+    return e.length > 800 ? `${e.slice(0, 800)}...(truncated ${e.length})` : e;
+  if (Array.isArray(e))
+    return t >= 3 ? `[Array(${e.length})]` : e.slice(0, 20).map((n) => khaiSafeLogValue(n, t + 1, r));
+  if (typeof e == "object") {
+    if (r.has(e))
+      return "[Circular]";
+    if (t >= 3)
+      return "[Object]";
+    r.add(e);
+    const n = {};
+    return Object.entries(e).slice(0, 40).forEach(([s, i]) => {
+      n[s] = KHAI_RUNTIME_SECRET_RE.test(s) ? "[redacted]" : khaiSafeLogValue(i, t + 1, r);
+    }), n;
+  }
+  return String(e);
+}
+function khaiRuntimeShopCount(e) {
+  return Array.isArray(e) ? e.length : e && typeof e == "object" ? Array.isArray(e.shopList) ? e.shopList.length : Array.isArray(e.shops) ? e.shops.length : Array.isArray(e.list) ? e.list.length : Array.isArray(e.data) ? e.data.length : 0 : 0;
+}
+function khaiWriteRuntimeLog(e, t = {}) {
+  const r = t && typeof t == "object" ? t : { message: t }, n = r.source || e || "main", s = r.event || r.action || "event", i = ["error", "warn", "info", "debug"].includes(r.level) ? r.level : "info", o = { ...r };
+  delete o.source, delete o.event, delete o.action, delete o.level;
+  const a = Object.prototype.hasOwnProperty.call(o, "data") && Object.keys(o).length === 1 ? o.data : o, c = `[khai-runtime][${n}][${s}] ${JSON.stringify(khaiSafeLogValue(a))}`;
+  (khaiRuntimeLog[i] || khaiRuntimeLog.info).call(khaiRuntimeLog, c), (Log[i] || Log.info)(c);
+}
 ipcMain$1.on("log", (e, t) => {
-  Log[t.type](t.message);
+  Log[t.type](t.message), t && typeof t.message == "string" && (t.message.includes("[listen-test]") || t.message.includes("[popup-debug]")) && khaiWriteRuntimeLog("renderer-log", { event: "forwarded-log", level: t.type, data: { message: t.message } });
+});
+ipcMain$1.on("khai-runtime-log", (e, t = {}) => {
+  khaiWriteRuntimeLog("renderer", t);
 });
 function bind(e, t) {
   return function() {
@@ -26525,7 +26563,8 @@ class createWindow {
     }), ipcMain$1.on("close-window", () => {
       console.log("关闭窗口"), this.win && this.win.close();
     }), ipcMain$1.on("open-log", () => {
-      shell$1.openPath(path$2.join(app$1.getPath("userData"), "logs", "main.log"));
+      const n = path$2.join(app$1.getPath("userData"), "logs", "main.log");
+      khaiWriteRuntimeLog("main", { event: "open-log", data: { path: n } }), shell$1.openPath(n);
     });
     let r = !1;
     this.win.on("close", async (n) => {
@@ -27329,10 +27368,10 @@ function sendPopupDebugPayload(e, t, r, n = 150) {
 }
 function showPopupDebugMode() {
   const e = getPopupDebugSamples();
-  openMessageWindow(), layoutPopupDebugWindows(), [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((t) => setPromptWindowVisible(t, !0)), sendTodoListToWindow(e.todoList), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.customerMessage), sendPopupDebugPayload(aiRepliedMessageWindow.win, "get-ai-replied-message", e.aiRepliedMessage), sendPopupDebugPayload(aiMissedMessageWindow.win, "add-ai-missed-message", e.aiMissedMessage), sendPopupDebugPayload(aiErrorMessageWindow.win, "get-aierror-select-shop", e.shop, 120), sendPopupDebugPayload(aiErrorMessageWindow.win, "add-ai-error-message", e.aiErrorMessage, 220), popupDebugVisible = !0, Log.info("[popup-debug] show all prompt windows with local samples");
+  openMessageWindow(), layoutPopupDebugWindows(), [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((t) => setPromptWindowVisible(t, !0)), sendTodoListToWindow(e.todoList), sendPopupDebugPayload(PDDMessageWindow.win, "get-customer-message", e.customerMessage), sendPopupDebugPayload(aiRepliedMessageWindow.win, "get-ai-replied-message", e.aiRepliedMessage), sendPopupDebugPayload(aiMissedMessageWindow.win, "add-ai-missed-message", e.aiMissedMessage), sendPopupDebugPayload(aiErrorMessageWindow.win, "get-aierror-select-shop", e.shop, 120), sendPopupDebugPayload(aiErrorMessageWindow.win, "add-ai-error-message", e.aiErrorMessage, 220), popupDebugVisible = !0, khaiWriteRuntimeLog("popup-debug", { event: "show", data: { windows: ["message", "todo", "ai", "ai-missed", "ai-error"] } }), Log.info("[popup-debug] show all prompt windows with local samples");
 }
 function hidePopupDebugMode() {
-  [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((e) => setPromptWindowVisible(e, !1)), popupDebugVisible = !1, Log.info("[popup-debug] hide all prompt windows");
+  [PDDMessageWindow.win, todoListWindow.win, aiRepliedMessageWindow.win, aiMissedMessageWindow.win, aiErrorMessageWindow.win].forEach((e) => setPromptWindowVisible(e, !1)), popupDebugVisible = !1, khaiWriteRuntimeLog("popup-debug", { event: "hide" }), Log.info("[popup-debug] hide all prompt windows");
 }
 function togglePopupDebugMode() {
   popupDebugVisible ? hidePopupDebugMode() : showPopupDebugMode();
@@ -27341,7 +27380,7 @@ ipcMain$1.on(
   "toggle-message-window",
   (e, t) => {
     const { platform: r, show: n } = t;
-    Log.info(`[listen-test][popup-toggle] platform=${r}, show=${n}`);
+    khaiWriteRuntimeLog("popup", { event: "toggle-message-window", data: { platform: r, show: !!n } }), Log.info(`[listen-test][popup-toggle] platform=${r}, show=${n}`);
     switch (r) {
       case "all":
         setPromptWindowVisible(PDDMessageWindow.win, n);
@@ -27365,7 +27404,7 @@ ipcMain$1.on("resize-message-window", (e, t = {}) => {
   if (!PDDMessageWindow.win || PDDMessageWindow.win.isDestroyed())
     return;
   const r = screen.getPrimaryDisplay().workArea, n = PDDMessageWindow.win.getBounds(), s = clampPromptWindowSize(t.width, 320, Math.min(680, r.width - 40)), i = clampPromptWindowSize(t.height, 260, Math.min(900, r.height - 40)), o = clampPromptWindowSize(n.x, r.x, r.x + r.width - s), a = clampPromptWindowSize(n.y, r.y, r.y + r.height - i);
-  Log.info(`[listen-test][message-resize] width=${s}, height=${i}, x=${o}, y=${a}`);
+  khaiWriteRuntimeLog("popup", { event: "resize-message-window", data: { width: s, height: i, x: o, y: a } }), Log.info(`[listen-test][message-resize] width=${s}, height=${i}, x=${o}, y=${a}`);
   PDDMessageWindow.win.setBounds({ x: o, y: a, width: s, height: i });
 });
 let todoListBoundsAnimationTimer = null;
@@ -27391,7 +27430,7 @@ ipcMain$1.on("todoList-collapse", (e, t) => {
   todoListWindow.win && !todoListWindow.win.isDestroyed() && (() => {
     const r = t ? 96 : 420, n = t ? 96 : 283;
     const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, d = s.x + s.width, o = Math.min(Math.max(d - r, i.x), i.x + i.width - r), a = Math.min(Math.max(s.y, i.y), i.y + i.height - n);
-    Log.info(`[listen-test][todo-collapse] collapsed=${t}, width=${r}, height=${n}, x=${o}, y=${a}`);
+    khaiWriteRuntimeLog("todo", { event: "collapse", data: { collapsed: !!t, width: r, height: n, x: o, y: a } }), Log.info(`[listen-test][todo-collapse] collapsed=${t}, width=${r}, height=${n}, x=${o}, y=${a}`);
     animateTodoListBounds(todoListWindow.win, { x: o, y: a, width: r, height: n }, 180);
   })();
 });
@@ -27402,7 +27441,7 @@ ipcMain$1.on("move-todo-floating-window", (e, t = {}) => {
   if (r === 0 && n === 0)
     return;
   const s = todoListWindow.win.getBounds(), i = screen.getDisplayMatching(s).workArea, o = Math.min(Math.max(s.x + r, i.x), i.x + i.width - s.width), a = Math.min(Math.max(s.y + n, i.y), i.y + i.height - s.height);
-  (Math.abs(r) >= 6 || Math.abs(n) >= 6) && Log.info(`[listen-test][todo-move] dx=${r}, dy=${n}, x=${Math.round(o)}, y=${Math.round(a)}`);
+  (Math.abs(r) >= 6 || Math.abs(n) >= 6) && (khaiWriteRuntimeLog("todo", { event: "move-floating-window", data: { dx: r, dy: n, x: Math.round(o), y: Math.round(a) } }), Log.info(`[listen-test][todo-move] dx=${r}, dy=${n}, x=${Math.round(o)}, y=${Math.round(a)}`));
   todoListWindow.win.setBounds({ x: Math.round(o), y: Math.round(a), width: s.width, height: s.height });
 });
 function closePromptWindow(e) {
@@ -41635,7 +41674,7 @@ app$1.whenReady().then(async () => {
   var s;
   forceDirectSessionProxy(session.defaultSession, "default");
   const e = path__default.dirname(thatLog.transports.file.getFile().path);
-  await cleanOldLogs(e, 2), globalShortcut.register("CommandOrControl+Shift+I", () => !1), globalShortcut.register("CommandOrControl+Shift+J", () => !1);
+  await cleanOldLogs(e, 2), khaiWriteRuntimeLog("main", { event: "app-ready", data: { version: app$1.getVersion(), userData: app$1.getPath("userData"), logs: e, sessionData: app$1.getPath("sessionData") } }), globalShortcut.register("CommandOrControl+Shift+I", () => !1), globalShortcut.register("CommandOrControl+Shift+J", () => !1);
   try {
     await RegistryService.getInstance().initializeRegistrySettings();
   } catch (i) {
@@ -41700,12 +41739,12 @@ app$1.whenReady().then(async () => {
   }), ipcMain$1.handle("get-config-sync-snapshot", () => getConfigSyncSnapshot()), ipcMain$1.handle("clear-config-store", () => (clearConfigStore(), !0)), ipcMain$1.on(
     "account-expiry-changed",
     (i, o) => {
-      store.set("accountExpired", o.expired), o.expired ? hideAllShopViews() : showAllShopViews();
+      khaiWriteRuntimeLog("account", { event: "account-expiry-changed", data: { expired: !!(o == null ? void 0 : o.expired) } }), store.set("accountExpired", o.expired), o.expired ? hideAllShopViews() : showAllShopViews();
     }
   ), ipcMain$1.handle("get-account-expiry-status", () => store.get("accountExpired", !1)), ipcMain$1.on("set-user-info", (i, o) => {
-    store.set("userInfo", o);
+    khaiWriteRuntimeLog("account", { event: "set-user-info", data: { keys: o && typeof o == "object" ? Object.keys(o) : [], hasUser: !!o } }), store.set("userInfo", o);
   }), ipcMain$1.handle("get-user-info", () => store.get("userInfo")), ipcMain$1.on("sync-shop-store", (i, o) => {
-    syncShopStore(o);
+    khaiWriteRuntimeLog("shop-store", { event: "sync-shop-store", data: { shopCount: khaiRuntimeShopCount(o) } }), syncShopStore(o);
   });
   const r = path__default.join(app$1.getPath("userData"), "loginData.json"), n = path__default.join(app$1.getPath("userData"), "shopData.json");
   ipcMain$1.handle("save-login-data", async (i, o) => {
@@ -41714,20 +41753,20 @@ app$1.whenReady().then(async () => {
         r,
         JSON.stringify(o, null, 2),
         "utf-8"
-      ), Log.info("登录数据已保存到文件"), { success: !0 };
+      ), khaiWriteRuntimeLog("account", { event: "save-login-data", data: { path: r, keys: o && typeof o == "object" ? Object.keys(o) : [] } }), Log.info("登录数据已保存到文件"), { success: !0 };
     } catch (a) {
       return Log.error(`保存登录数据失败: ${a}`), { success: !1, error: String(a) };
     }
   }), ipcMain$1.handle("get-login-data", async () => {
     try {
       const i = await promises.readFile(r, "utf-8"), o = JSON.parse(i);
-      return Log.info("从文件读取登录数据成功"), o;
+      return khaiWriteRuntimeLog("account", { event: "get-login-data", data: { path: r, keys: o && typeof o == "object" ? Object.keys(o) : [] } }), Log.info("从文件读取登录数据成功"), o;
     } catch (i) {
       return i.code === "ENOENT" ? (Log.info("登录数据文件不存在"), null) : (Log.error(`读取登录数据失败: ${i}`), null);
     }
   }), ipcMain$1.handle("clear-login-data", async () => {
     try {
-      return await promises.unlink(r), Log.info("登录数据文件已删除"), { success: !0 };
+      return await promises.unlink(r), khaiWriteRuntimeLog("account", { event: "clear-login-data", data: { path: r } }), Log.info("登录数据文件已删除"), { success: !0 };
     } catch (i) {
       return i.code === "ENOENT" ? (Log.info("登录数据文件不存在，无需删除"), { success: !0 }) : (Log.error(`删除登录数据失败: ${i}`), { success: !1, error: String(i) });
     }
@@ -41738,20 +41777,20 @@ app$1.whenReady().then(async () => {
         n,
         JSON.stringify(o, null, 2),
         "utf-8"
-      ), Log.info("店铺数据已保存到文件"), { success: !0 };
+      ), khaiWriteRuntimeLog("shop-store", { event: "save-shop-data", data: { path: n, shopCount: khaiRuntimeShopCount(o) } }), Log.info("店铺数据已保存到文件"), { success: !0 };
     } catch (a) {
       return Log.error(`保存店铺数据失败: ${a}`), { success: !1, error: String(a) };
     }
   }), ipcMain$1.handle("get-shop-data", async () => {
     try {
-      const i = await promises.readFile(n, "utf-8");
-      return JSON.parse(i);
+      const i = await promises.readFile(n, "utf-8"), o = JSON.parse(i);
+      return khaiWriteRuntimeLog("shop-store", { event: "get-shop-data", data: { path: n, shopCount: khaiRuntimeShopCount(o) } }), o;
     } catch (i) {
       return i.code === "ENOENT" ? (Log.info("店铺数据文件不存在"), null) : (Log.error(`读取店铺数据失败: ${i}`), null);
     }
   }), ipcMain$1.handle("clear-shop-data", async () => {
     try {
-      return await promises.unlink(n), Log.info("店铺数据文件已删除"), { success: !0 };
+      return await promises.unlink(n), khaiWriteRuntimeLog("shop-store", { event: "clear-shop-data", data: { path: n } }), Log.info("店铺数据文件已删除"), { success: !0 };
     } catch (i) {
       return i.code === "ENOENT" ? (Log.info("店铺数据文件不存在，无需删除"), { success: !0 }) : (Log.error(`删除店铺数据失败: ${i}`), { success: !1, error: String(i) });
     }
@@ -42049,6 +42088,7 @@ ipcMain$1.on(
   }
 );
 ipcMain$1.on("reported-index-list", async (e, t) => {
+  khaiWriteRuntimeLog("message", { event: "reported-index-list", data: { count: Array.isArray(t) ? t.length : 1 } });
   if (Array.isArray(t))
     for (const r of t)
       indexLog.info(r);
@@ -42063,6 +42103,7 @@ ipcMain$1.on("reported-index-list", async (e, t) => {
     indexLog.info(t);
 });
 ipcMain$1.on("reported-message-list", async (e, t) => {
+  khaiWriteRuntimeLog("message", { event: "reported-message-list", data: { count: Array.isArray(t) ? t.length : 1 } });
   if (Array.isArray(t))
     for (const r of t)
       messageLog.info(r);
@@ -42070,13 +42111,13 @@ ipcMain$1.on("reported-message-list", async (e, t) => {
     messageLog.info(t);
 });
 ipcMain$1.on("reported-replymessage-list", async (e, t) => {
-  replymessageLog.info(t);
+  khaiWriteRuntimeLog("message", { event: "reported-replymessage-list", data: { count: Array.isArray(t) ? t.length : 1 } }), replymessageLog.info(t);
 });
 ipcMain$1.on("get-strat-dd-message", async (e, t) => {
-  startdd.info(t);
+  khaiWriteRuntimeLog("reply", { event: "get-start-dd-message" }), startdd.info(t);
 });
 ipcMain$1.on("get-end-dd-message", async (e, t) => {
-  enddd.info(t);
+  khaiWriteRuntimeLog("reply", { event: "get-end-dd-message" }), enddd.info(t);
 });
 ipcMain$1.handle("check-clipboard-formats", () => clipboard.availableFormats());
 async function cleanOldLogs(e, t = 2) {
