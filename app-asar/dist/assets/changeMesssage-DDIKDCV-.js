@@ -1604,6 +1604,18 @@ _t("shop-webview-message", (e, t) => {
         jt(e).send("change-pdd-show-robot-reply", At.settings.PDDShowRobotReply);
       });
   }),
+  _t("change-pdd-hide-aftersale-status-card", (e, t) => {
+    At.settings.PDDHideAftersaleStatusCard = !!t;
+    bt.shopList
+      .filter((e) => "拼多多" === e.platformType)
+      .map((e) => e.id)
+      .forEach((e) => {
+        jt(e).send(
+          "change-pdd-hide-aftersale-status-card",
+          At.settings.PDDHideAftersaleStatusCard,
+        );
+      });
+  }),
   _t("set-reminder-reply-config", (e, t) => {
     ((At.reminderReply.status = t.status),
       (At.reminderReply.time = t.time),
@@ -2156,7 +2168,12 @@ const es = (e, t) => {
       const o = { shopSystemId: e, botStatus: Dt.value[s].botStatus };
       (hs(t, "update-shop-bot-status", o),
         "拼多多" === Dt.value[s].platformType &&
-          hs(t, "change-pdd-show-robot-reply", At.settings.PDDShowRobotReply));
+          (hs(t, "change-pdd-show-robot-reply", At.settings.PDDShowRobotReply),
+          hs(
+            t,
+            "change-pdd-hide-aftersale-status-card",
+            !!At.settings.PDDHideAftersaleStatusCard,
+          )));
     } catch (s) {}
   },
   Is = (e) => {

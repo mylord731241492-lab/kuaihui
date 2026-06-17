@@ -54,6 +54,7 @@ let wsConnectState = -0x1,
   thatshopName = "",
   isLoginSuccess = ![],
   isPDDShowRobotReply = ![],
+  isPDDHideAftersaleStatusCard = ![],
   hasSentLoginInfo = ![],
   isAutoOnlineBlocked = ![];
 class AutoOnlineBlockDB {
@@ -501,6 +502,15 @@ const mouseActivityHandler = (a) => {
         type: "CHANGE_PDD_SHOW_ROBOT_REPLY",
         data: { isPDDShowRobotReply: b },
       }));
+  }),
+  safeIpcOn("change-pdd-hide-aftersale-status-card", (a, b) => {
+    ((isPDDHideAftersaleStatusCard = !!b),
+      (window["__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"] = !!b),
+      window["postMessage"]({
+        type: "CHANGE_PDD_HIDE_AFTERSALE_STATUS_CARD",
+        data: { isPDDHideAftersaleStatusCard: !!b },
+      }),
+      !!b && document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]());
   }),
   document["addEventListener"]("DOMContentLoaded", () => {
     setTimeout(async () => {
@@ -8702,6 +8712,7 @@ function antigain() {
     c = new (a("fbeZ"))({ serverTime: b })["messagePack"]();
   return c;
 }
+window["__KHAI_PDD_RUNTIME_AFTERSALE_CARD__"] = !![];
 function khaiPddRuntimeLog(a, b = {}, c = "info") {
   try {
     ipcRenderer["send"]("khai-runtime-log", {
@@ -9430,6 +9441,7 @@ function khaiPddEnsureOrderExtraStyle() {
         box-sizing: border-box;
         display: flex;
         flex-direction: column;
+        transition: right .18s ease, top .18s ease, width .18s ease, height .18s ease, padding .18s ease, border-radius .18s ease;
       }
       #khai-pdd-order-extra-panel .khai-order-extra-title {
         display: flex;
@@ -9528,15 +9540,33 @@ function khaiPddEnsureOrderExtraStyle() {
         user-select: none;
       }
       #khai-pdd-order-extra-panel.khai-order-extra-collapsed {
-        width: 236px !important;
-        height: auto !important;
+        top: var(--khai-pdd-order-extra-tab-top, 50%) !important;
+        right: 390px !important;
+        width: 28px !important;
+        height: 132px !important;
         min-width: 0;
         min-height: 0;
-        padding: 9px 12px;
+        max-width: none;
+        max-height: none;
+        padding: 8px 4px;
+        border-right: 0;
+        border-radius: 7px 0 0 7px;
         cursor: pointer;
+        touch-action: none;
+        transform: translateY(-50%);
+        overflow: hidden;
       }
       #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-title {
         margin-bottom: 0;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-close {
+        display: none;
       }
       #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-body,
       #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-resize {
@@ -9585,6 +9615,47 @@ function khaiPddApplyOrderExtraPanelSize(a) {
     b["height"] && (a["style"]["height"] = khaiPddClampNumber(b["height"], 0xf0, Math["max"](0xf0, d)) + "px");
   } catch (b) {}
 }
+function khaiPddGetOrderExtraTabTop() {
+  try {
+    const a = Number(localStorage["getItem"]("khai-pdd-order-extra-tab-top") || "");
+    if (a) return khaiPddClampNumber(a, 0x58, Math["max"](0x58, window["innerHeight"] - 0x58));
+  } catch (a) {}
+  return Math["round"](window["innerHeight"] / 0x2);
+}
+function khaiPddApplyOrderExtraTabTop(a) {
+  if (!a) return;
+  a["style"]["setProperty"]("--khai-pdd-order-extra-tab-top", khaiPddGetOrderExtraTabTop() + "px");
+}
+function khaiPddBindOrderExtraPanelDrag(a) {
+  if (!a || a["__khaiPddTabDragBound"]) return;
+  a["__khaiPddTabDragBound"] = !![];
+  a["addEventListener"]("pointerdown", (b) => {
+    if (!a["classList"]["contains"]("khai-order-extra-collapsed")) return;
+    if (b["target"]?.["closest"]?.(".khai-order-extra-close,.khai-order-extra-resize")) return;
+    const c = b["clientY"],
+      d = khaiPddGetOrderExtraTabTop();
+    let f = ![];
+    const g = (h) => {
+        if (!f && Math["abs"](h["clientY"] - c) < 0x3) return;
+        f = !![];
+        h["preventDefault"]();
+        const j = khaiPddClampNumber(d + h["clientY"] - c, 0x58, Math["max"](0x58, window["innerHeight"] - 0x58));
+        a["style"]["setProperty"]("--khai-pdd-order-extra-tab-top", j + "px");
+        try {
+          localStorage["setItem"]("khai-pdd-order-extra-tab-top", String(Math["round"](j)));
+        } catch (k) {}
+      },
+      h = () => {
+        document["removeEventListener"]("pointermove", g, !![]);
+        document["removeEventListener"]("pointerup", h, !![]);
+        document["removeEventListener"]("pointercancel", h, !![]);
+        f && (a["__khaiPddTabDragSuppressClick"] = !![]);
+      };
+    document["addEventListener"]("pointermove", g, !![]);
+    document["addEventListener"]("pointerup", h, !![]);
+    document["addEventListener"]("pointercancel", h, !![]);
+  });
+}
 function khaiPddBindOrderExtraPanelResize(a) {
   if (!a || a["__khaiPddResizeBound"]) return;
   a["__khaiPddResizeBound"] = !![];
@@ -9618,8 +9689,12 @@ function khaiPddBindOrderExtraPanelResize(a) {
     document["addEventListener"]("pointerup", l, !![]);
   });
 }
-let khaiPddCollapsedOrderExtraKey = "";
+let khaiPddExpandedOrderExtraKey = "";
 function khaiPddRenderOrderExtraPanel(a, b) {
+  if (isPDDHideAftersaleStatusCard || window["__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"]) {
+    document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
+    return;
+  }
   khaiPddEnsureOrderExtraStyle();
   if (!a?.["orderSn"]) return;
   const afterSaleStatus =
@@ -9631,13 +9706,16 @@ function khaiPddRenderOrderExtraPanel(a, b) {
     a["orderSn"] +
     ":" +
     afterSaleStatus;
-  const isCollapsed = khaiPddCollapsedOrderExtraKey === c;
+  const isCollapsed = khaiPddExpandedOrderExtraKey !== c;
   let d = document["getElementById"]("khai-pdd-order-extra-panel");
   d ||
     ((d = document["createElement"]("div")),
     (d["id"] = "khai-pdd-order-extra-panel"),
     khaiPddApplyOrderExtraPanelSize(d));
   khaiPddBindOrderExtraPanelResize(d);
+  khaiPddBindOrderExtraPanelDrag(d);
+  khaiPddApplyOrderExtraTabTop(d);
+  d["__khaiPddLastOrderExtraArgs"] = { order: a, detail: b };
   d["classList"]["toggle"]("khai-order-extra-collapsed", isCollapsed);
   const f = b?.["refundAmount"] || "",
     g = afterSaleStatus,
@@ -9653,8 +9731,8 @@ function khaiPddRenderOrderExtraPanel(a, b) {
     m = khaiPddRenderAftersaleExtraFields(l);
   d["innerHTML"] = `
     <div class="khai-order-extra-title">
-      <span>${isCollapsed ? "售后信息已收起" : "快回检测到售后状态"}</span>
-      <button class="khai-order-extra-close" type="button">${isCollapsed ? "展开" : "收起"}</button>
+      <span>${isCollapsed ? "售后状态" : "快回检测到售后状态"}</span>
+      <button class="khai-order-extra-close" type="button">关闭</button>
     </div>
     <div class="khai-order-extra-body">
       <div class="khai-order-extra-line">
@@ -9678,19 +9756,40 @@ function khaiPddRenderOrderExtraPanel(a, b) {
     <div class="khai-order-extra-resize" title="拖动调整大小"></div>
   `;
   const togglePanel = () => {
-    const l = khaiPddCollapsedOrderExtraKey === c;
-    khaiPddCollapsedOrderExtraKey = l ? "" : c;
-    khaiPddRuntimeLog(l ? "pdd-order-extra-expand" : "pdd-order-extra-collapse", { orderSnTail: String(a["orderSn"])["slice"](-0x6) });
+    const l = khaiPddExpandedOrderExtraKey === c;
+    khaiPddExpandedOrderExtraKey = l ? "" : c;
+    khaiPddRuntimeLog(l ? "pdd-order-extra-collapse" : "pdd-order-extra-expand", { orderSnTail: String(a["orderSn"])["slice"](-0x6) });
     khaiPddRenderOrderExtraPanel(a, b);
   };
   d["querySelector"](".khai-order-extra-close")?.["addEventListener"]("click", (l) => {
     l["stopPropagation"]();
-    togglePanel();
+    khaiPddExpandedOrderExtraKey = "";
+    khaiPddRuntimeLog("pdd-order-extra-collapse", { orderSnTail: String(a["orderSn"])["slice"](-0x6), source: "close-button" });
+    khaiPddRenderOrderExtraPanel(a, b);
   });
-  isCollapsed &&
-    d["querySelector"](".khai-order-extra-title")?.["addEventListener"]("click", () => {
-      togglePanel();
-    });
+  d["onclick"] = isCollapsed
+    ? () => {
+        if (d["__khaiPddTabDragSuppressClick"]) {
+          d["__khaiPddTabDragSuppressClick"] = ![];
+          return;
+        }
+        togglePanel();
+      }
+    : null;
+  if (!d["__khaiPddOutsideClickBound"]) {
+    d["__khaiPddOutsideClickBound"] = !![];
+    document["addEventListener"](
+      "click",
+      (l) => {
+        const m = document["getElementById"]("khai-pdd-order-extra-panel");
+        if (!m || m["classList"]["contains"]("khai-order-extra-collapsed") || m["contains"](l["target"])) return;
+        const n = m["__khaiPddLastOrderExtraArgs"];
+        khaiPddExpandedOrderExtraKey = "";
+        n?.["order"] && khaiPddRenderOrderExtraPanel(n["order"], n["detail"]);
+      },
+      !![],
+    );
+  }
   document["body"]["appendChild"](d);
 }
 async function khaiPddFetchOrderContext(a, b) {
@@ -9732,12 +9831,18 @@ async function khaiPddFetchOrderContext(a, b) {
 }
 let khaiPddLastVisibleOrderKey = "";
 async function khaiPddSyncVisibleOrderExtra() {
+  if (isPDDHideAftersaleStatusCard || window["__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"]) {
+    khaiPddLastVisibleOrderKey = "";
+    khaiPddExpandedOrderExtraKey = "";
+    document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
+    return;
+  }
   const activeChatId = khaiPddGetActiveChatId(),
     b = khaiPddReadVisibleOrderPanel(activeChatId);
   if (!b?.["orderSn"]) return;
   if (!khaiPddLooksLikeAftersaleOrder(b)) {
     khaiPddLastVisibleOrderKey = "";
-    khaiPddCollapsedOrderExtraKey = "";
+    khaiPddExpandedOrderExtraKey = "";
     document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
     return;
   }

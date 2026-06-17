@@ -133,6 +133,7 @@ let thatshopName = "";
 // 是否登录成功
 let isLoginSuccess = false;
 let isPDDShowRobotReply = false; // 默认获取机器人信息'
+let isPDDHideAftersaleStatusCard = false;
 let hasSentLoginInfo = false;
 let isAutoOnlineBlocked = false; // 当前店铺是否禁止自动切回在线
 
@@ -716,6 +717,1253 @@ safeIpcOn("change-pdd-show-robot-reply", (_, data) => {
     },
   });
 });
+safeIpcOn("change-pdd-hide-aftersale-status-card", (_, data) => {
+  isPDDHideAftersaleStatusCard = !!data;
+  window.__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD = !!data;
+  window.postMessage({
+    type: "CHANGE_PDD_HIDE_AFTERSALE_STATUS_CARD",
+    data: {
+      isPDDHideAftersaleStatusCard: !!data,
+    },
+  });
+  if (data) document.getElementById("khai-pdd-order-extra-panel")?.remove();
+});
+
+window["__KHAI_PDD_RUNTIME_AFTERSALE_CARD__"] = !![];
+function khaiPddRuntimeLog(a, b = {}, c = "info") {
+  try {
+    ipcRenderer["send"]("khai-runtime-log", {
+      source: "pdd-preload",
+      event: a,
+      level: c,
+      data: b,
+    });
+  } catch (d) {}
+}
+function khaiPddFormatMoney(a) {
+  if (a == null || a === "") return "";
+  if (typeof a === "string") {
+    const b = a["trim"]();
+    if (!b) return "";
+    if (/¥|￥|\d+\.\d{1,2}/["test"](b)) return b["replace"](/^¥/, "￥");
+    a = b["replace"](/[^\d.-]/g, "");
+  }
+  const c = Number(a);
+  return Number["isNaN"](c) ? String(a)["trim"]() : "￥" + (c >= 0x64 && Number["isInteger"](c) ? c / 0x64 : c)["toFixed"](0x2);
+}
+function khaiPddParseDateSecond(a) {
+  const b = String(a || "")["match"](/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+  if (!b) return 0x0;
+  const c = new Date(
+    Number(b[0x1]),
+    Number(b[0x2]) - 0x1,
+    Number(b[0x3]),
+    Number(b[0x4] || 0x0),
+    Number(b[0x5] || 0x0),
+    Number(b[0x6] || 0x0),
+  );
+  const d = Math["floor"](c["getTime"]() / 0x3e8);
+  return Number["isFinite"](d) ? d : 0x0;
+}
+function khaiPddPickValue(a, b) {
+  const c = [a],
+    d = new Set();
+  while (c["length"]) {
+    const f = c["shift"]();
+    if (!f || typeof f !== "object" || d["has"](f)) continue;
+    d["add"](f);
+    for (const [g, h] of Object["entries"](f)) {
+      if (b["includes"](g) && h != null && h !== "") return h;
+      if (h && typeof h === "object") c["push"](h);
+    }
+  }
+  return "";
+}
+function khaiPddFindArray(a, b) {
+  const c = [a],
+    d = new Set();
+  while (c["length"]) {
+    const f = c["shift"]();
+    if (!f || typeof f !== "object" || d["has"](f)) continue;
+    d["add"](f);
+    for (const [g, h] of Object["entries"](f)) {
+      if (Array["isArray"](h) && h["length"] && (!b || b["some"]((j) => g["toLowerCase"]()["includes"](j)))) return h;
+      if (h && typeof h === "object") c["push"](h);
+    }
+  }
+  return [];
+}
+function khaiPddPickTraceDescription(a) {
+  const b = ["context", "desc", "description", "traceDesc", "content", "text", "message", "logisticsStateDesc", "stateDesc", "remark", "opDesc"],
+    c = [a],
+    d = new Set(),
+    f = [];
+  while (c["length"]) {
+    const g = c["shift"]();
+    if (!g || typeof g !== "object" || d["has"](g)) continue;
+    d["add"](g);
+    for (const [h, j] of Object["entries"](g)) {
+      typeof j === "string" && b["includes"](h) && j["trim"]() && f["push"](j["trim"]());
+      j && typeof j === "object" && c["push"](j);
+    }
+  }
+  const g = (h) =>
+    h &&
+    h["length"] > 0x8 &&
+    !/^[\u4e00-\u9fa5]{2,8}快递$/.test(h) &&
+    /(包裹|快件|物流|快递|签收|发货|揽收|派件|中转|目的地|已到达|已离开|已送达|已验收|已收取|商家已发货)/.test(h);
+  return f["filter"](g)["sort"]((h, j) => j["length"] - h["length"])[0x0] || "";
+}
+function khaiPddExtractRefundInfo(a) {
+  if (!a) return { refundAmount: "", afterSaleStatus: "" };
+  const b = [
+      "refundAmountStr",
+      "refund_amount_str",
+      "refundFeeStr",
+      "refund_fee_str",
+      "actualRefundAmount",
+      "realRefundAmount",
+      "applyRefundAmount",
+      "afterSalesRefundAmount",
+      "refundAmount",
+      "refund_amount",
+      "refundFee",
+      "refund_fee",
+    ],
+    c = [
+      "afterSaleStatusDesc",
+      "afterSalesStatusDesc",
+      "refundStatusDesc",
+      "serviceStatusDesc",
+      "statusDesc",
+      "afterSaleStatus",
+      "afterSalesStatus",
+      "refundStatus",
+    ];
+  return {
+    refundAmount: khaiPddFormatMoney(khaiPddPickValue(a, b)),
+    afterSaleStatus: String(khaiPddPickValue(a, c) || "")["trim"](),
+  };
+}
+function khaiPddTraceEntryText(a) {
+  if (a == null) return "";
+  if (typeof a === "string") return a["trim"]();
+  const b = [
+      "time",
+      "timeStr",
+      "ftime",
+      "traceTime",
+      "operateTime",
+      "acceptTime",
+      "createTime",
+      "createdAt",
+    ],
+    d = String(khaiPddPickValue(a, b) || "")["trim"](),
+    f = khaiPddPickTraceDescription(a);
+  return f ? (f + (d ? "\n" + d : ""))["trim"]() : "";
+}
+function khaiPddExtractTraceList(...a) {
+  for (const b of a) {
+    if (!b) continue;
+    const c =
+      b["traceInfoList"] ||
+      b["trace_info_list"] ||
+      b["logisticsTraceList"] ||
+      b["logistics_trace_list"] ||
+      b["trackingInfoList"] ||
+      b["tracking_info_list"] ||
+      b["logisticsInfo"]?.["traceInfoList"] ||
+      b["shippingInfo"]?.["traceInfoList"] ||
+      khaiPddFindArray(b, ["trace", "logistics", "tracking"]);
+    if (Array["isArray"](c) && c["length"]) {
+      return c["map"](khaiPddTraceEntryText)["filter"](Boolean)["slice"](0x0, 0x14);
+    }
+  }
+  return [];
+}
+function khaiPddBuildLogisticsTrace(...a) {
+  return khaiPddExtractTraceList(...a)["join"]("\n");
+}
+async function khaiPddFetchOrderExtra(a, b, c) {
+  const d = { refundAmount: "", afterSaleStatus: "", logisticsTraceList: khaiPddExtractTraceList(b, c), detailFields: [] };
+  d["logisticsTrace"] = d["logisticsTraceList"]["join"]("\n");
+  if (!a) return d;
+  try {
+    const f = Math["floor"](Date["now"]() / 0x3e8),
+      g = f - 0x16d * 0x18 * 0x3c * 0x3c,
+      h = await fetch("https://mms.pinduoduo.com/mercury/mms/afterSales/queryList", {
+        method: "post",
+        mode: "cors",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON["stringify"]({
+          pageSize: 0xa,
+          pageNumber: 0x1,
+          orderByCreatedAtDesc: !![],
+          mallRemarkStatus: null,
+          mallRemarkTag: null,
+          orderSn: String(a),
+          orderNo: String(a),
+          startCreatedTime: g,
+          endCreatedTime: f,
+        }),
+      });
+    if (h["ok"]) {
+      const j = await h["json"](),
+        k = khaiPddFindArray(j, ["list", "data", "item", "record", "after"]);
+      if (k["length"]) {
+        const l = k["find"]((m) => {
+          try {
+            return JSON["stringify"](m)["includes"](String(a));
+          } catch (n) {
+            return ![];
+          }
+        }) || k[0x0],
+          m = khaiPddExtractRefundInfo(l);
+        ((d["refundAmount"] = m["refundAmount"]), (d["afterSaleStatus"] = m["afterSaleStatus"]), (d["detailFields"] = khaiPddExtractAftersaleFieldsFromRecord(l)));
+      }
+    }
+    khaiPddRuntimeLog("pdd-order-extra-fetch", {
+      orderSnTail: String(a)["slice"](-0x6),
+      hasRefundAmount: !!d["refundAmount"],
+      hasAfterSaleStatus: !!d["afterSaleStatus"],
+      logisticsTraceCount: d["logisticsTraceList"]["length"],
+      detailFieldCount: d["detailFields"]["length"],
+    });
+  } catch (f) {
+    khaiPddRuntimeLog(
+      "pdd-order-extra-fetch-error",
+      { orderSnTail: String(a)["slice"](-0x6), message: f?.["message"] || String(f) },
+      "warn",
+    );
+  }
+  return d;
+}
+function khaiPddTextOf(a) {
+  return String((a && (a["innerText"] || a["textContent"])) || "")["replace"](/\r/g, "")["trim"]();
+}
+function khaiPddCountTraceEntries(a) {
+  return (String(a || "")["match"](/\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2}/g) || [])["length"];
+}
+function khaiPddLooksLikeAftersaleOrder(a) {
+  const b = String((a && (a["afterSaleStatus"] || a["orderStatus"])) || "")["trim"]();
+  return !!(a?.["orderSn"] && /(售后|退款|退货|退差价|换货|退款成功|退款中|仅退款)/.test(b));
+}
+function khaiPddReadNextLineValue(a, b, c = 0x0) {
+  for (let d = c; d < a["length"]; d++) {
+    const f = a[d];
+    for (const g of b) {
+      if (f === g || f === g + "：" || f === g + ":") {
+        for (let h = d + 0x1; h < a["length"]; h++) {
+          if (!a[h] || a[h] === "复制" || a[h] === "-") continue;
+          return a[h];
+        }
+      }
+      if (f["startsWith"](g + "：") || f["startsWith"](g + ":")) {
+        const h = f["replace"](new RegExp("^" + g + "[：:]\\s*"), "")["trim"]();
+        if (h) return h;
+      }
+    }
+  }
+  return "";
+}
+const khaiPddAftersaleExtraLabels = [
+  "售后单号",
+  "售后编号",
+  "售后类型",
+  "申请原因",
+  "退款原因",
+  "退货原因",
+  "申请时间",
+  "退款时间",
+  "退货包运费",
+  "退货物流",
+  "物流公司",
+  "快递公司",
+  "快递单号",
+  "运单号",
+  "处理结果",
+  "商家处理",
+  "平台处理",
+  "责任方",
+  "退款去向",
+];
+function khaiPddIsAftersaleExtraLabel(a) {
+  const b = String(a || "")["trim"](),
+    c = b["replace"](/[：:]\s*$/, "")["trim"](),
+    d = ["订单编号", "下单时间", "售后状态", "退款金额", "物流轨迹", "协商详情", "聊天记录", ...khaiPddAftersaleExtraLabels];
+  return d["some"]((f) => c === f || b["startsWith"](f + "：") || b["startsWith"](f + ":"));
+}
+function khaiPddCleanAftersaleExtraValue(a) {
+  const b = String(a == null ? "" : a)
+    ["replace"](/\r/g, "")
+    ["replace"](/\s+/g, " ")
+    ["trim"]();
+  if (!b || b === "-" || /^(复制|关闭|查看全部|点击查看更多|修改备注|物流信息|查看说明书|新增额外包裹|查看视频)$/.test(b)) return "";
+  if (khaiPddIsAftersaleExtraLabel(b)) return "";
+  return b;
+}
+function khaiPddReadAftersaleExtraValue(a, b) {
+  for (let c = 0x0; c < a["length"]; c++) {
+    const d = String(a[c] || "")["trim"](),
+      f = d["match"](new RegExp("^" + b + "[：:]\\s*(.+)$"));
+    if (f?.[0x1]) {
+      const g = khaiPddCleanAftersaleExtraValue(f[0x1]);
+      if (g) return g;
+    }
+    if (d === b || d === b + "：" || d === b + ":") {
+      for (let g = c + 0x1; g < Math["min"](a["length"], c + 0x5); g++) {
+        if (khaiPddIsAftersaleExtraLabel(a[g])) break;
+        const h = khaiPddCleanAftersaleExtraValue(a[g]);
+        if (h) return h;
+      }
+    }
+  }
+  return "";
+}
+function khaiPddPushAftersaleExtraField(a, b, c) {
+  const d = khaiPddCleanAftersaleExtraValue(c);
+  if (!d) return;
+  const f = b === "售后编号" ? "售后单号" : b;
+  if (a["some"]((g) => g["label"] === f || g["value"] === d)) return;
+  a["push"]({ label: f, value: d });
+}
+function khaiPddMergeAftersaleExtraFields(...a) {
+  const b = [];
+  for (const c of a) {
+    if (!Array["isArray"](c)) continue;
+    c["forEach"]((d) => khaiPddPushAftersaleExtraField(b, d?.["label"] || "", d?.["value"] || ""));
+  }
+  return b["slice"](0x0, 0x10);
+}
+function khaiPddExtractAftersaleFieldsFromLines(a, b = {}) {
+  const c = [];
+  khaiPddPushAftersaleExtraField(c, "售后单号", b["id"] || b["afterSaleId"] || b["aftersaleId"] || "");
+  for (const d of khaiPddAftersaleExtraLabels) khaiPddPushAftersaleExtraField(c, d, khaiPddReadAftersaleExtraValue(a, d));
+  return c;
+}
+function khaiPddExtractAftersaleFieldsFromRecord(a) {
+  if (!a) return [];
+  const b = [];
+  khaiPddPushAftersaleExtraField(b, "售后单号", a["id"] || a["afterSalesId"] || a["afterSaleId"] || "");
+  khaiPddPushAftersaleExtraField(b, "售后类型", khaiPddPickValue(a, ["afterSalesTypeName", "afterSaleTypeName", "serviceTypeName", "typeName"]));
+  khaiPddPushAftersaleExtraField(b, "申请原因", khaiPddPickValue(a, ["reason", "applyReason", "afterSalesReason", "refundReason"]));
+  khaiPddPushAftersaleExtraField(b, "申请时间", khaiPddPickValue(a, ["createdAtStr", "createdTimeStr", "applyTimeStr", "applyCreatedAtStr"]));
+  khaiPddPushAftersaleExtraField(b, "退款时间", khaiPddPickValue(a, ["refundTimeStr", "successTimeStr"]));
+  khaiPddPushAftersaleExtraField(b, "退货包运费", khaiPddFormatMoney(khaiPddPickValue(a, ["freightAmount", "returnFreightAmount", "shippingFee"])));
+  return b;
+}
+function khaiPddExtractAftersaleDetailHint(a, b) {
+  if (!a) return {};
+  const c = String(b || "")["trim"](),
+    d = [];
+  Array["from"](a["querySelectorAll"]("a[href],[href],[data-href],[data-url],[data-link],[data-router],[data-route]"))["forEach"]((f) => {
+    Array["from"](f["attributes"] || [])["forEach"]((g) => {
+      if (!/(href|url|link|router|route)/i.test(g["name"])) return;
+      const h = String(g["value"] || "")["trim"]();
+      /after/i.test(h) && d["push"](h);
+    });
+  });
+  for (const f of d) {
+    let g = f;
+    try {
+      g = new URL(f, location["origin"])["href"];
+    } catch (h) {}
+    if (!/aftersales/i.test(g) || !/detail/i.test(g)) continue;
+    if (c && !g["includes"](c) && !/id=\d+/.test(g)) continue;
+    const h = g["match"](/[?&]id=(\d+)/)?.[0x1] || "";
+    return { aftersaleId: h, aftersaleDetailUrl: g };
+  }
+  return {};
+}
+function khaiPddCleanAftersaleTrace(a) {
+  return String(a || "")
+    ["replace"](/\r/g, "")
+    ["replace"](/去修改物流信息/g, "")
+    ["split"](/\n+/)
+    ["map"]((b) => b["trim"]())
+    ["filter"]((b) => b && !/^(查看全部|点击查看更多|复制|关闭)$/.test(b))
+    ["join"]("\n")
+    ["replace"](/\n{3,}/g, "\n\n")
+    ["trim"]();
+}
+function khaiPddParseAftersaleDetailDocument(a, b = {}, c = {}) {
+  if (!a?.["body"]) return null;
+  const d = khaiPddTextOf(a["body"]),
+    f = d["split"](/\n+/)["map"]((p) => p["trim"]())["filter"](Boolean),
+    g = String(b["orderSn"] || c["orderSn"] || (d["match"](/订单编号[:：]?\s*([0-9-]+)/) || [])[0x1] || "")["trim"]();
+  if (!g) return null;
+  const h = a["querySelector"]("#detail-express-box"),
+    j = khaiPddCleanAftersaleTrace(h ? khaiPddTextOf(h) : "");
+  let k = khaiPddFormatMoney(khaiPddReadNextLineValue(f, ["退款金额"]));
+  !k && (k = khaiPddFormatMoney((d["match"](/退款金额[:：]?\s*([￥¥]?\s*\d+(?:\.\d{1,2})?)/) || [])[0x1] || ""));
+  const l = khaiPddReadNextLineValue(f, ["售后类型"]) || c["afterSalesTypeName"] || "";
+  let m = "";
+  const n = f["findIndex"]((p) => p === "售后状态" || p === "售后状态：" || p === "售后状态:");
+  if (n >= 0x0) {
+    for (let p = n + 0x1; p < f["length"]; p++) {
+      const q = f[p];
+      if (/^(退款金额|协商详情|聊天记录|联系消费者|备注|订单权益|物流轨迹)/.test(q)) break;
+      if (/如何降低|查看整改建议|平台邀请|本单商品/.test(q)) continue;
+      if (/(退款|退货|成功|关闭|处理中|驳回|同意|拒绝)/.test(q)) {
+        m = q;
+        break;
+      }
+    }
+  }
+  !m && (m = String(c["afterSalesTitle"] || b["afterSaleStatus"] || "")["trim"]());
+  l && m && !m["includes"](l) && (m = l + "，" + m);
+  !m && (m = l);
+  return {
+    orderSn: g,
+    aftersaleId: c["id"] || "",
+    refundAmount: k || khaiPddFormatMoney(c["refundAmount"]),
+    afterSaleStatus: m,
+    logisticsTrace: j,
+    detailFields: khaiPddMergeAftersaleExtraFields(khaiPddExtractAftersaleFieldsFromRecord(c), khaiPddExtractAftersaleFieldsFromLines(f, c)),
+    traceCount: khaiPddCountTraceEntries(j),
+  };
+}
+function khaiPddBuildAftersaleSearchRanges(a) {
+  const b = Math["floor"](Date["now"]() / 0x3e8),
+    c = Number(a?.["orderCreatedAtSec"] || 0x0),
+    d = [];
+  if (c) {
+    d["push"]([Math["max"](0x0, c - 0x18 * 0xe10), Math["min"](b + 0x18 * 0xe10, c + 0xf * 0x18 * 0xe10), 0x6]);
+    d["push"]([Math["max"](0x0, c - 0x18 * 0xe10), Math["min"](b + 0x18 * 0xe10, c + 0x2d * 0x18 * 0xe10), 0x8]);
+  } else d["push"]([b - 0x78 * 0x18 * 0xe10, b, 0x8]);
+  return d;
+}
+async function khaiPddFindAftersaleRecordForOrder(a) {
+  const b = String(a?.["orderSn"] || "")["trim"]();
+  if (!b) return null;
+  if (a?.["aftersaleId"]) {
+    return {
+      id: a["aftersaleId"],
+      orderSn: b,
+      refundAmount: a["refundAmount"] || "",
+      afterSalesTitle: a["afterSaleStatus"] || "",
+      detailUrl: a["aftersaleDetailUrl"] || "",
+      detailFields: a["detailFields"] || [],
+    };
+  }
+  const c = new Set();
+  for (const [d, f, g] of khaiPddBuildAftersaleSearchRanges(a)) {
+    const h = d + ":" + f;
+    if (c["has"](h)) continue;
+    c["add"](h);
+    for (let j = 0x1; j <= g; j++) {
+      const k = await fetch("https://mms.pinduoduo.com/mercury/mms/afterSales/queryList", {
+        method: "post",
+        mode: "cors",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON["stringify"]({
+          pageSize: 0x64,
+          pageNumber: j,
+          orderByCreatedAtDesc: !![],
+          mallRemarkStatus: null,
+          mallRemarkTag: null,
+          startCreatedTime: d,
+          endCreatedTime: f,
+        }),
+      });
+      if (!k["ok"]) break;
+      const l = await k["json"](),
+        m = l?.["result"]?.["list"] || khaiPddFindArray(l, ["list", "data", "item", "record", "after"]);
+      if (!Array["isArray"](m) || !m["length"]) break;
+      const n = m["find"]((p) => String(p?.["orderSn"] || "") === b) || m["find"]((p) => {
+        try {
+          return JSON["stringify"](p)["includes"](b);
+        } catch (q) {
+          return ![];
+        }
+      });
+      if (n) {
+        khaiPddRuntimeLog("pdd-chat-auto-aftersale-find-record", {
+          orderSnTail: b["slice"](-0x6),
+          aftersaleIdTail: String(n["id"] || "")["slice"](-0x6),
+          pageNumber: j,
+          hasRefundAmount: !!n["refundAmount"],
+        });
+        return n;
+      }
+      if (m["length"] < 0x64) break;
+    }
+  }
+  return null;
+}
+async function khaiPddFetchAftersaleDetailByFrame(a, b) {
+  const c = String(a?.["orderSn"] || b?.["orderSn"] || "")["trim"](),
+    d = String(b?.["id"] || "")["trim"]();
+  if (!c || !d) return null;
+  const f = "khai-pdd-aftersale-detail-frame",
+    g = b?.["detailUrl"] || "https://mms.pinduoduo.com/aftersales-ssr/detail?id=" + encodeURIComponent(d) + "&orderSn=" + encodeURIComponent(c);
+  let k = null;
+  try {
+    const l = await fetch(g, { method: "GET", credentials: "include", mode: "cors" });
+    if (l["ok"]) {
+      const m = await l["text"](),
+        n = new DOMParser()["parseFromString"](m, "text/html");
+      k = khaiPddParseAftersaleDetailDocument(n, a, b);
+      if (k?.["refundAmount"] && k?.["logisticsTrace"] && k["traceCount"] >= 0x2) return k;
+    }
+  } catch (l) {}
+  document["getElementById"](f)?.["remove"]();
+  const h = document["createElement"]("iframe");
+  ((h["id"] = f),
+    (h["style"]["cssText"] =
+      "position:fixed;left:-10000px;top:-10000px;width:1200px;height:900px;opacity:0;pointer-events:none;z-index:-1;"),
+    h["setAttribute"]("aria-hidden", "true"),
+    (h["src"] = g),
+    document["body"]["appendChild"](h));
+  const j = (l) => new Promise((m) => setTimeout(m, l));
+  try {
+    for (let l = 0x0; l < 0x1e; l++) {
+      await j(0x12c);
+      const m = h["contentDocument"],
+        n = h["contentWindow"];
+      if (!m?.["body"]) continue;
+      try {
+        n?.["scrollTo"]?.(0x0, 0x1869f);
+      } catch (p) {}
+      const p = m["querySelector"]("#detail-express-box");
+      if (p) {
+        try {
+          p["scrollTop"] = p["scrollHeight"] || 0x1869f;
+        } catch (q) {}
+        Array["from"](p["querySelectorAll"]("button,a,span,div"))["forEach"]((q) => {
+          const r = khaiPddTextOf(q);
+          if (/^(查看全部|点击查看更多)$/.test(r) && !q["__khaiPddClickedViewAll"]) {
+            q["__khaiPddClickedViewAll"] = !![];
+            try {
+              q["click"]();
+            } catch (s) {}
+          }
+        });
+      }
+      k = khaiPddParseAftersaleDetailDocument(m, a, b);
+      if (k?.["refundAmount"] && k?.["logisticsTrace"] && k["traceCount"] >= 0x2) break;
+    }
+  } finally {
+    h["remove"]();
+  }
+  return k;
+}
+const khaiPddAutoAftersaleDetailCache = {},
+  khaiPddAutoAftersaleDetailInflight = {};
+function khaiPddGetCachedAutoAftersaleDetail(a) {
+  const b = khaiPddAutoAftersaleDetailCache[String(a || "")];
+  return b && Date["now"]() - b["time"] < 0x927c0 ? b["data"] : null;
+}
+function khaiPddRequestAutoAftersaleDetail(a) {
+  const b = String(a?.["orderSn"] || "")["trim"]();
+  if (!b || !khaiPddLooksLikeAftersaleOrder(a)) return null;
+  const c = khaiPddGetCachedAutoAftersaleDetail(b);
+  if (c?.["logisticsTrace"]) return Promise["resolve"](c);
+  if (khaiPddAutoAftersaleDetailInflight[b]) return khaiPddAutoAftersaleDetailInflight[b];
+  khaiPddRuntimeLog("pdd-chat-auto-aftersale-fetch-start", {
+    orderSnTail: b["slice"](-0x6),
+    hasOrderTime: !!a["orderCreatedAtSec"],
+  });
+  khaiPddAutoAftersaleDetailInflight[b] = (async () => {
+    const d = await khaiPddFindAftersaleRecordForOrder(a);
+    if (!d?.["id"]) {
+      khaiPddRuntimeLog("pdd-chat-auto-aftersale-fetch-error", { orderSnTail: b["slice"](-0x6), reason: "record-not-found" }, "warn");
+      return null;
+    }
+    const provisional = {
+      orderSn: b,
+      aftersaleId: d["id"],
+      refundAmount: khaiPddFormatMoney(d["refundAmount"]) || a["refundAmount"] || "",
+      afterSaleStatus: d["afterSalesTitle"] || a["afterSaleStatus"] || "",
+      logisticsTrace: "",
+      detailFields: khaiPddMergeAftersaleExtraFields(d["detailFields"], khaiPddExtractAftersaleFieldsFromRecord(d), a["detailFields"]),
+      traceCount: 0x0,
+    };
+    khaiPddAutoAftersaleDetailCache[b] = { time: Date["now"](), data: provisional };
+    const f = await khaiPddFetchAftersaleDetailByFrame(a, d),
+      g = {
+        orderSn: b,
+        aftersaleId: d["id"],
+        refundAmount: f?.["refundAmount"] || provisional["refundAmount"] || "",
+        afterSaleStatus: f?.["afterSaleStatus"] || d["afterSalesTitle"] || a["afterSaleStatus"] || "",
+        logisticsTrace: f?.["logisticsTrace"] || "",
+        detailFields: khaiPddMergeAftersaleExtraFields(f?.["detailFields"], provisional["detailFields"]),
+        traceCount: f?.["traceCount"] || 0x0,
+      };
+    khaiPddAutoAftersaleDetailCache[b] = { time: Date["now"](), data: g };
+    khaiPddRuntimeLog("pdd-chat-auto-aftersale-fetch-success", {
+      orderSnTail: b["slice"](-0x6),
+      aftersaleIdTail: String(d["id"] || "")["slice"](-0x6),
+      hasRefundAmount: !!g["refundAmount"],
+      traceCount: g["traceCount"] || khaiPddCountTraceEntries(g["logisticsTrace"]),
+      detailFieldCount: g["detailFields"]["length"],
+      detailLoaded: !!f,
+    });
+    return g;
+  })()["catch"]((d) => {
+    khaiPddRuntimeLog("pdd-chat-auto-aftersale-fetch-error", { orderSnTail: b["slice"](-0x6), message: d?.["message"] || String(d) }, "warn");
+    return null;
+  })["finally"](() => {
+    delete khaiPddAutoAftersaleDetailInflight[b];
+  });
+  return khaiPddAutoAftersaleDetailInflight[b];
+}
+function khaiPddGetActiveChatId() {
+  const a = [
+    ".chat-list-box\x20.chat-item-box.transition.active[data-random]",
+    ".chat-item-box.transition.active[data-random]",
+    ".chat-item-box.active[data-random]",
+    "[data-random].active",
+  ];
+  for (const b of a) {
+    const c = document["querySelector"](b),
+      d = c?.["getAttribute"]("data-random")?.["split"]("-")?.[0x0] || "";
+    if (d) return d;
+  }
+  return "";
+}
+function khaiPddReadVisibleLogisticsTrace() {
+  const a = document["querySelector"](".right-panel-container"),
+    b = [a, document["body"]]["filter"](Boolean);
+  const cleanTraceText = (c) =>
+    String(c || "")
+      ["replace"](/\r/g, "")
+      ["replace"](/(^|\n)\s*\d+(?=您的包裹|您的快件|【)/g, "$1")
+      ["replace"](/([^\n])(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})/g, "$1\n$2")
+      ["replace"](/\n{3,}/g, "\n\n")
+      ["split"](/\n+/)
+      ["map"]((d) => d["trim"]())
+      ["filter"]((d) => d && !/^\d+$/.test(d) && !/^(点击查看更多|查看全部|关闭|复制)$/.test(d))
+      ["join"]("\n")
+      ["trim"]();
+  const isVisible = (c) => {
+      const d = c?.["getBoundingClientRect"]?.();
+      return !!d && d["width"] > 0x0 && d["height"] > 0x0;
+    },
+    detailLooksUseful = (c) =>
+      c &&
+      !/^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(c) &&
+      !/^(点击查看更多|查看全部|关闭|复制)$/.test(c) &&
+      /(包裹|快件|物流|快递|签收|发货|揽收|派件|中转|目的地|已到达|已离开|已送达|已验收|已收取)/.test(c);
+  const c = [];
+  for (const d of b) {
+    c["push"](
+      ...Array["from"](
+        d["querySelectorAll"](
+          ".shipping-box .shipping-item, .shipping-history .shipping-item, .shipping-item, .logistics-item, .express-item, .timeline-item, .ant-timeline-item, .el-timeline-item",
+        ),
+      ),
+    );
+  }
+  const d = Array["from"](new Set(c))["filter"](isVisible);
+  if (d["length"]) {
+    return d
+      ["map"]((f) => cleanTraceText(f["innerText"] || f["textContent"] || ""))
+      ["filter"]((f) => /\d{4}[-/]\d{2}[-/]\d{2}/["test"](f) && f["length"] > 0xa && detailLooksUseful(f))
+      ["slice"](0x0, 0x14)
+      ["join"]("\n\n");
+  }
+  const e = b
+      ["map"]((f) => (f["innerText"] || f["textContent"] || "")["replace"](/\r/g, "")["trim"]())
+      ["filter"]((f) => f["includes"]("快递信息") || f["includes"]("物流信息") || f["includes"]("您的包裹") || f["includes"]("您的快件"))
+      ["sort"]((f, g) => f["length"] - g["length"])[0x0];
+  if (!e) return "";
+  const f = e["split"](/\n+/)["map"]((g) => g["trim"]())["filter"](Boolean),
+    g = [];
+  for (let h = 0x0; h < f["length"]; h++) {
+    if (/^\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(f[h])) {
+      const j = f[h + 0x1] || "",
+        k = f[h - 0x1] || "",
+        l = detailLooksUseful(k) ? k : detailLooksUseful(j) ? j : "";
+      l && g["push"](l + "\n" + f[h]);
+    }
+  }
+  return g["slice"](0x0, 0x14)["join"]("\n\n");
+}
+const khaiPddLastVisibleOrderSnapshotByChat = {};
+function khaiPddReadVisibleOrderPanel(a) {
+  const b = khaiPddReadVisibleLogisticsTrace(),
+    c = a ? khaiPddLastVisibleOrderSnapshotByChat[a] : null,
+    d = document["querySelector"](".right-panel-container");
+  if (!d) return b && c ? { ...c, logisticsTrace: b } : null;
+  const rawText = (d["innerText"] || d["textContent"] || "")["replace"](/\r/g, ""),
+    lines = rawText["split"](/\n+/)["map"]((k) => k["trim"]())["filter"](Boolean),
+    e = rawText["replace"](/\s+/g, " ")["trim"]();
+  if (!e || !e["includes"]("订单编号")) return b && c ? { ...c, logisticsTrace: b } : null;
+  const f = e["match"](/订单编号[:：]\s*([0-9-]+)/),
+    h =
+      e["match"](/退款金额[:：]?\s*([￥¥]?\s*\d+(?:\.\d{1,2})?)/) ||
+      e["match"](/实退(?:金额)?[:：]?\s*([￥¥]?\s*\d+(?:\.\d{1,2})?)/),
+    n = e["match"](/下单时间[:：]?\s*(\d{4}[\/-]\d{1,2}[\/-]\d{1,2}(?:\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)?)/);
+  if (!f?.[0x1]) return b && c ? { ...c, logisticsTrace: b } : null;
+  const detailHint = khaiPddExtractAftersaleDetailHint(d, f[0x1]),
+    detailFields = khaiPddExtractAftersaleFieldsFromLines(lines, { id: detailHint["aftersaleId"] || "" });
+  let g = "";
+  for (let k = 0x0; k < lines["length"]; k++) {
+    const l = lines[k]["match"](/^售后状态[:：]?\s*(.*)$/);
+    if (!l) continue;
+    g = (l[0x1] || "")["trim"]();
+    if (!g) {
+      for (let m = k + 0x1; m < lines["length"]; m++) {
+        if (/^(订单编号|下单时间|复制|退货包运费|修改备注|物流信息|小额打款|查看说明书|新增额外包裹|查看视频)/.test(lines[m])) break;
+        g = lines[m];
+        break;
+      }
+    }
+    break;
+  }
+  !g && (g = e["match"](/售后状态[:：]\s*(.{1,40}?)(?=\s+(退款金额|退货金额|退货包运费|物流信息|快递信息|订单编号|下单时间|复制)|$)/)?.[0x1]?.["trim"]() || "");
+  const j = {
+    orderSn: f[0x1],
+    afterSaleStatus: g || "",
+    refundAmount: h?.[0x1] ? khaiPddFormatMoney(h[0x1]) : "",
+    logisticsTrace: b,
+    orderCreatedAtSec: n?.[0x1] ? khaiPddParseDateSecond(n[0x1]) : c?.["orderCreatedAtSec"] || 0x0,
+    orderCreatedAtText: n?.[0x1] || "",
+    aftersaleId: detailHint["aftersaleId"] || "",
+    aftersaleDetailUrl: detailHint["aftersaleDetailUrl"] || "",
+    detailFields,
+  };
+  a && (khaiPddLastVisibleOrderSnapshotByChat[a] = j);
+  return j;
+}
+function khaiPddEnsureOrderExtraStyle() {
+  if (document["getElementById"]("khai-pdd-order-extra-style")) return;
+  const a = document["createElement"]("style");
+  ((a["id"] = "khai-pdd-order-extra-style"),
+    (a["textContent"] = `
+      #khai-pdd-order-extra-panel {
+        position: fixed;
+        top: 118px;
+        right: 390px;
+        width: 390px;
+        height: 440px;
+        min-width: 360px;
+        min-height: 240px;
+        max-width: calc(100vw - 430px);
+        max-height: calc(100vh - 140px);
+        overflow: hidden;
+        z-index: 2147483646;
+        padding: 12px 14px 18px;
+        background: #fff;
+        border: 1px solid #dbeafe;
+        border-left: 4px solid #3b82f6;
+        border-radius: 8px;
+        color: #1f2937;
+        font-size: 12px;
+        line-height: 1.55;
+        box-shadow: 0 12px 34px rgba(15, 23, 42, .16);
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        transition: right .18s ease, top .18s ease, width .18s ease, height .18s ease, padding .18s ease, border-radius .18s ease;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        font-weight: 700;
+        color: #2563eb;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-close {
+        border: 0;
+        background: #eff6ff;
+        color: #2563eb;
+        border-radius: 4px;
+        padding: 2px 7px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-body {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+        flex-direction: column;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-line {
+        margin: 3px 0;
+        word-break: break-word;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-trace-line {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+        flex-direction: column;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-label {
+        color: #6b7280;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-money {
+        color: #ef4444;
+        font-weight: 700;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-fields {
+        margin: 5px 0 6px;
+        padding: 6px 8px;
+        background: #f9fafb;
+        border: 1px solid #eef2ff;
+        border-radius: 4px;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-field {
+        display: flex;
+        gap: 6px;
+        margin: 2px 0;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-field .khai-order-extra-label {
+        flex: 0 0 auto;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-value {
+        flex: 1 1 auto;
+        min-width: 0;
+        color: #374151;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-trace {
+        margin-top: 4px;
+        padding: 6px 8px;
+        background: #f8fafc;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        color: #374151;
+        flex: 1 1 auto;
+        min-height: 120px;
+        max-height: none;
+        overflow: auto;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-resize {
+        position: absolute;
+        right: 5px;
+        bottom: 5px;
+        width: 16px;
+        height: 16px;
+        cursor: nwse-resize;
+        opacity: .72;
+      }
+      #khai-pdd-order-extra-panel .khai-order-extra-resize::after {
+        content: "";
+        position: absolute;
+        right: 1px;
+        bottom: 1px;
+        width: 10px;
+        height: 10px;
+        border-right: 2px solid #93c5fd;
+        border-bottom: 2px solid #93c5fd;
+        border-radius: 2px;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-resizing {
+        user-select: none;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed {
+        top: var(--khai-pdd-order-extra-tab-top, 50%) !important;
+        right: 390px !important;
+        width: 28px !important;
+        height: 132px !important;
+        min-width: 0;
+        min-height: 0;
+        max-width: none;
+        max-height: none;
+        padding: 8px 4px;
+        border-right: 0;
+        border-radius: 7px 0 0 7px;
+        cursor: pointer;
+        touch-action: none;
+        transform: translateY(-50%);
+        overflow: hidden;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-title {
+        margin-bottom: 0;
+        height: 100%;
+        flex-direction: column;
+        justify-content: center;
+        gap: 8px;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-close {
+        display: none;
+      }
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-body,
+      #khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-resize {
+        display: none;
+      }
+      @media (max-width: 1200px) {
+        #khai-pdd-order-extra-panel {
+          right: 24px;
+          top: 106px;
+          max-width: calc(100vw - 48px);
+        }
+      }
+    `),
+    document["head"]["appendChild"](a));
+}
+function khaiPddEscapeHtml(a) {
+  return String(a == null ? "" : a)["replace"](/[&<>"']/g, (b) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[b]);
+}
+function khaiPddRenderAftersaleExtraFields(a) {
+  const b = khaiPddMergeAftersaleExtraFields(a);
+  if (!b["length"]) return "";
+  return `
+      <div class="khai-order-extra-fields">
+        ${b["map"]((c) => `
+        <div class="khai-order-extra-field">
+          <span class="khai-order-extra-label">${khaiPddEscapeHtml(c["label"])}：</span>
+          <span class="khai-order-extra-value">${khaiPddEscapeHtml(c["value"])}</span>
+        </div>`)["join"]("")}
+      </div>`;
+}
+function khaiPddClampNumber(a, b, c) {
+  return Math["max"](b, Math["min"](c, Number(a) || b));
+}
+function khaiPddApplyOrderExtraPanelSize(a) {
+  try {
+    const b = JSON["parse"](localStorage["getItem"]("khai-pdd-order-extra-size") || "{}"),
+      c = window["innerWidth"] > 0x4b0 ? window["innerWidth"] - 0x1ae : window["innerWidth"] - 0x30,
+      d = window["innerHeight"] - 0x8c;
+    b["width"] && (a["style"]["width"] = khaiPddClampNumber(b["width"], 0x168, Math["max"](0x168, c)) + "px");
+    b["height"] && (a["style"]["height"] = khaiPddClampNumber(b["height"], 0xf0, Math["max"](0xf0, d)) + "px");
+  } catch (b) {}
+}
+function khaiPddGetOrderExtraTabTop() {
+  try {
+    const a = Number(localStorage["getItem"]("khai-pdd-order-extra-tab-top") || "");
+    if (a) return khaiPddClampNumber(a, 0x58, Math["max"](0x58, window["innerHeight"] - 0x58));
+  } catch (a) {}
+  return Math["round"](window["innerHeight"] / 0x2);
+}
+function khaiPddApplyOrderExtraTabTop(a) {
+  if (!a) return;
+  a["style"]["setProperty"]("--khai-pdd-order-extra-tab-top", khaiPddGetOrderExtraTabTop() + "px");
+}
+function khaiPddBindOrderExtraPanelDrag(a) {
+  if (!a || a["__khaiPddTabDragBound"]) return;
+  a["__khaiPddTabDragBound"] = !![];
+  a["addEventListener"]("pointerdown", (b) => {
+    if (!a["classList"]["contains"]("khai-order-extra-collapsed")) return;
+    if (b["target"]?.["closest"]?.(".khai-order-extra-close,.khai-order-extra-resize")) return;
+    const c = b["clientY"],
+      d = khaiPddGetOrderExtraTabTop();
+    let f = ![];
+    const g = (h) => {
+        if (!f && Math["abs"](h["clientY"] - c) < 0x3) return;
+        f = !![];
+        h["preventDefault"]();
+        const j = khaiPddClampNumber(d + h["clientY"] - c, 0x58, Math["max"](0x58, window["innerHeight"] - 0x58));
+        a["style"]["setProperty"]("--khai-pdd-order-extra-tab-top", j + "px");
+        try {
+          localStorage["setItem"]("khai-pdd-order-extra-tab-top", String(Math["round"](j)));
+        } catch (k) {}
+      },
+      h = () => {
+        document["removeEventListener"]("pointermove", g, !![]);
+        document["removeEventListener"]("pointerup", h, !![]);
+        document["removeEventListener"]("pointercancel", h, !![]);
+        f && (a["__khaiPddTabDragSuppressClick"] = !![]);
+      };
+    document["addEventListener"]("pointermove", g, !![]);
+    document["addEventListener"]("pointerup", h, !![]);
+    document["addEventListener"]("pointercancel", h, !![]);
+  });
+}
+function khaiPddBindOrderExtraPanelResize(a) {
+  if (!a || a["__khaiPddResizeBound"]) return;
+  a["__khaiPddResizeBound"] = !![];
+  a["addEventListener"]("pointerdown", (b) => {
+    const c = b["target"]?.["closest"]?.(".khai-order-extra-resize");
+    if (!c) return;
+    b["preventDefault"]();
+    const d = a["getBoundingClientRect"](),
+      f = b["clientX"],
+      g = b["clientY"],
+      h = window["innerWidth"] > 0x4b0 ? window["innerWidth"] - 0x1ae : window["innerWidth"] - 0x30,
+      j = window["innerHeight"] - 0x8c;
+    let resizeWidth = d["width"],
+      resizeHeight = d["height"];
+    a["classList"]["add"]("khai-order-extra-resizing");
+    const k = (l) => {
+        resizeWidth = khaiPddClampNumber(d["width"] + l["clientX"] - f, 0x168, Math["max"](0x168, h));
+        resizeHeight = khaiPddClampNumber(d["height"] + l["clientY"] - g, 0xf0, Math["max"](0xf0, j));
+        a["style"]["width"] = resizeWidth + "px";
+        a["style"]["height"] = resizeHeight + "px";
+      },
+      l = () => {
+        document["removeEventListener"]("pointermove", k, !![]);
+        document["removeEventListener"]("pointerup", l, !![]);
+        a["classList"]["remove"]("khai-order-extra-resizing");
+        try {
+          localStorage["setItem"]("khai-pdd-order-extra-size", JSON["stringify"]({ width: Math["round"](resizeWidth), height: Math["round"](resizeHeight) }));
+        } catch (m) {}
+      };
+    document["addEventListener"]("pointermove", k, !![]);
+    document["addEventListener"]("pointerup", l, !![]);
+  });
+}
+let khaiPddExpandedOrderExtraKey = "";
+function khaiPddRenderOrderExtraPanel(a, b) {
+  if (isPDDHideAftersaleStatusCard || window["__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"]) {
+    document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
+    return;
+  }
+  khaiPddEnsureOrderExtraStyle();
+  if (!a?.["orderSn"]) return;
+  const afterSaleStatus =
+    b?.["afterSaleStatus"] && !/^\d+$/.test(String(b["afterSaleStatus"]))
+      ? b["afterSaleStatus"]
+      : a["afterSaleStatus"] || b?.["afterSaleStatus"] || "";
+  if (!khaiPddLooksLikeAftersaleOrder({ ...a, afterSaleStatus })) return;
+  const c =
+    a["orderSn"] +
+    ":" +
+    afterSaleStatus;
+  const isCollapsed = khaiPddExpandedOrderExtraKey !== c;
+  let d = document["getElementById"]("khai-pdd-order-extra-panel");
+  d ||
+    ((d = document["createElement"]("div")),
+    (d["id"] = "khai-pdd-order-extra-panel"),
+    khaiPddApplyOrderExtraPanelSize(d));
+  khaiPddBindOrderExtraPanelResize(d);
+  khaiPddBindOrderExtraPanelDrag(d);
+  khaiPddApplyOrderExtraTabTop(d);
+  d["__khaiPddLastOrderExtraArgs"] = { order: a, detail: b };
+  d["classList"]["toggle"]("khai-order-extra-collapsed", isCollapsed);
+  const f = b?.["refundAmount"] || "",
+    g = afterSaleStatus,
+    h = b?.["logisticsTrace"] || "",
+    j = h || (b?.["loading"] ? "正在从售后详情读取完整物流..." : "暂无物流轨迹，正在继续监听更新"),
+    k = b?.["loading"] && !f ? "加载中..." : f || "获取中",
+    l = khaiPddMergeAftersaleExtraFields(
+      b?.["detailFields"],
+      a?.["detailFields"],
+      a?.["orderCreatedAtText"] ? [{ label: "下单时间", value: a["orderCreatedAtText"] }] : [],
+      a?.["aftersaleId"] ? [{ label: "售后单号", value: a["aftersaleId"] }] : [],
+    ),
+    m = khaiPddRenderAftersaleExtraFields(l);
+  d["innerHTML"] = `
+    <div class="khai-order-extra-title">
+      <span>${isCollapsed ? "售后状态" : "快回检测到售后状态"}</span>
+      <button class="khai-order-extra-close" type="button">关闭</button>
+    </div>
+    <div class="khai-order-extra-body">
+      <div class="khai-order-extra-line">
+        <span class="khai-order-extra-label">订单编号：</span>
+        <span>${khaiPddEscapeHtml(a["orderSn"])}</span>
+      </div>
+      <div class="khai-order-extra-line">
+        <span class="khai-order-extra-label">售后状态：</span>
+        <span>${khaiPddEscapeHtml(g || "获取中")}</span>
+      </div>
+      <div class="khai-order-extra-line">
+        <span class="khai-order-extra-label">退款金额：</span>
+        <span class="khai-order-extra-money">${khaiPddEscapeHtml(k)}</span>
+      </div>
+      ${m}
+      <div class="khai-order-extra-line khai-order-extra-trace-line">
+        <span class="khai-order-extra-label">物流轨迹：</span>
+        <div class="khai-order-extra-trace">${khaiPddEscapeHtml(j)}</div>
+      </div>
+    </div>
+    <div class="khai-order-extra-resize" title="拖动调整大小"></div>
+  `;
+  const togglePanel = () => {
+    const l = khaiPddExpandedOrderExtraKey === c;
+    khaiPddExpandedOrderExtraKey = l ? "" : c;
+    khaiPddRuntimeLog(l ? "pdd-order-extra-collapse" : "pdd-order-extra-expand", { orderSnTail: String(a["orderSn"])["slice"](-0x6) });
+    khaiPddRenderOrderExtraPanel(a, b);
+  };
+  d["querySelector"](".khai-order-extra-close")?.["addEventListener"]("click", (l) => {
+    l["stopPropagation"]();
+    khaiPddExpandedOrderExtraKey = "";
+    khaiPddRuntimeLog("pdd-order-extra-collapse", { orderSnTail: String(a["orderSn"])["slice"](-0x6), source: "close-button" });
+    khaiPddRenderOrderExtraPanel(a, b);
+  });
+  d["onclick"] = isCollapsed
+    ? () => {
+        if (d["__khaiPddTabDragSuppressClick"]) {
+          d["__khaiPddTabDragSuppressClick"] = ![];
+          return;
+        }
+        togglePanel();
+      }
+    : null;
+  if (!d["__khaiPddOutsideClickBound"]) {
+    d["__khaiPddOutsideClickBound"] = !![];
+    document["addEventListener"](
+      "click",
+      (l) => {
+        const m = document["getElementById"]("khai-pdd-order-extra-panel");
+        if (!m || m["classList"]["contains"]("khai-order-extra-collapsed") || m["contains"](l["target"])) return;
+        const n = m["__khaiPddLastOrderExtraArgs"];
+        khaiPddExpandedOrderExtraKey = "";
+        n?.["order"] && khaiPddRenderOrderExtraPanel(n["order"], n["detail"]);
+      },
+      !![],
+    );
+  }
+  document["body"]["appendChild"](d);
+}
+async function khaiPddFetchOrderContext(a, b) {
+  try {
+    const c = await fetch("https://mms.pinduoduo.com/latitude/order/userAllOrder", {
+      method: "POST",
+      credentials: "include",
+      mode: "cors",
+      headers: { "Content-Type": "application/json", "anti-content": antigain() },
+      body: JSON["stringify"]({ showHistory: !![], pageNo: 0x1, pageSize: 0xa, uid: a }),
+    });
+    if (!c["ok"]) return { orderItem: null, orderDetail: null };
+    const d = await c["json"](),
+      f = d?.["result"]?.["orders"] || [],
+      g = f["find"]((h) => String(h?.["orderSn"] || "") === String(b)) || null;
+    if (!g) return { orderItem: null, orderDetail: null };
+    try {
+      const h = await fetch("https://mms.pinduoduo.com/fopen/order/detail", {
+        method: "POST",
+        credentials: "include",
+        mode: "cors",
+        headers: { "Content-Type": "application/json" },
+        body: JSON["stringify"]({
+          biz_code: "chat",
+          order_sn: b,
+          receiver_info: ["mobile", "name", "address"],
+          scene_code: "mall_customer_wait_shipping_sign",
+        }),
+      });
+      if (h["ok"]) {
+        const j = await h["json"]();
+        return { orderItem: g, orderDetail: j?.["result"] || null };
+      }
+    } catch (h) {}
+    return { orderItem: g, orderDetail: null };
+  } catch (c) {
+    return { orderItem: null, orderDetail: null };
+  }
+}
+let khaiPddLastVisibleOrderKey = "";
+async function khaiPddSyncVisibleOrderExtra() {
+  if (isPDDHideAftersaleStatusCard || window["__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"]) {
+    khaiPddLastVisibleOrderKey = "";
+    khaiPddExpandedOrderExtraKey = "";
+    document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
+    return;
+  }
+  const activeChatId = khaiPddGetActiveChatId(),
+    b = khaiPddReadVisibleOrderPanel(activeChatId);
+  if (!b?.["orderSn"]) return;
+  if (!khaiPddLooksLikeAftersaleOrder(b)) {
+    khaiPddLastVisibleOrderKey = "";
+    khaiPddExpandedOrderExtraKey = "";
+    document["getElementById"]("khai-pdd-order-extra-panel")?.["remove"]();
+    return;
+  }
+  const a = activeChatId || "order:" + b["orderSn"];
+  const cachedDetail = khaiPddGetCachedAutoAftersaleDetail(b["orderSn"]),
+    visibleTrace = b["logisticsTrace"] || "",
+    visibleTraceKey = visibleTrace ? visibleTrace["slice"](0x0, 0x78) + ":" + visibleTrace["length"] : "",
+    detailKey = cachedDetail
+      ? [
+          cachedDetail["refundAmount"] || "",
+          cachedDetail["afterSaleStatus"] || "",
+          String(cachedDetail["logisticsTrace"] || "")["length"],
+          (cachedDetail["detailFields"] || [])["length"],
+        ]["join"](":")
+      : "",
+    c = a + ":" + b["orderSn"] + ":" + b["afterSaleStatus"] + ":" + visibleTraceKey + ":" + detailKey;
+  if (c === khaiPddLastVisibleOrderKey) return;
+  khaiPddLastVisibleOrderKey = c;
+  const detailRefundAmount = cachedDetail?.["refundAmount"] || "",
+    detailAfterSaleStatus = cachedDetail?.["afterSaleStatus"] || b["afterSaleStatus"] || "",
+    detailLogisticsTrace = cachedDetail?.["logisticsTrace"] || "",
+    detailFields = khaiPddMergeAftersaleExtraFields(cachedDetail?.["detailFields"], b["detailFields"]),
+    m = khaiPddRequestAutoAftersaleDetail({
+      ...b,
+      refundAmount: detailRefundAmount || b["refundAmount"] || "",
+      afterSaleStatus: detailAfterSaleStatus,
+      detailFields,
+    });
+  khaiPddRenderOrderExtraPanel(b, {
+    afterSaleStatus: detailAfterSaleStatus,
+    refundAmount: detailRefundAmount || b["refundAmount"] || "",
+    logisticsTrace: detailLogisticsTrace || visibleTrace,
+    detailFields,
+    loading: !detailRefundAmount || !detailLogisticsTrace,
+  });
+  const d = activeChatId ? await khaiPddFetchOrderContext(activeChatId, b["orderSn"]) : { orderItem: null, orderDetail: null },
+    f = await khaiPddFetchOrderExtra(b["orderSn"], d["orderItem"], d["orderDetail"]),
+    g = d["orderItem"]?.["orderStatusStr"] || "",
+    h =
+      f["afterSaleStatus"] && !/^\d+$/.test(String(f["afterSaleStatus"]))
+        ? f["afterSaleStatus"]
+        : b["afterSaleStatus"] || f["afterSaleStatus"] || "",
+    j = detailLogisticsTrace || f["logisticsTrace"] || visibleTrace,
+    k = detailRefundAmount || f["refundAmount"] || b["refundAmount"] || "",
+    l = detailAfterSaleStatus || h,
+    orderFields = khaiPddMergeAftersaleExtraFields(cachedDetail?.["detailFields"], f["detailFields"], b["detailFields"]);
+  khaiPddRenderOrderExtraPanel(b, {
+    refundAmount: k,
+    afterSaleStatus: l,
+    logisticsTrace: j,
+    detailFields: orderFields,
+    loading: !k || !j,
+  });
+  activeChatId &&
+    ipcRenderer["send"]("update-customer-message-order", {
+      messageId: activeChatId,
+      orderId: b["orderSn"],
+      orderStatus: g || b["afterSaleStatus"] || "",
+      refundAmount: k,
+      afterSaleStatus: l,
+      logisticsTrace: j,
+    });
+  m &&
+    m["then"]((n) => {
+      if (!n?.["orderSn"] || String(n["orderSn"]) !== String(b["orderSn"])) return;
+      const currentOrder = khaiPddReadVisibleOrderPanel(activeChatId);
+      if (!currentOrder?.["orderSn"] || String(currentOrder["orderSn"]) !== String(b["orderSn"])) return;
+      if (!khaiPddLooksLikeAftersaleOrder(currentOrder)) return;
+      const p = n["logisticsTrace"] || j,
+        q = n["refundAmount"] || k,
+        r = n["afterSaleStatus"] || l,
+        s = khaiPddMergeAftersaleExtraFields(n["detailFields"], orderFields, currentOrder["detailFields"]);
+      khaiPddRenderOrderExtraPanel(b, {
+        refundAmount: q,
+        afterSaleStatus: r,
+        logisticsTrace: p,
+        detailFields: s,
+      });
+      activeChatId &&
+        ipcRenderer["send"]("update-customer-message-order", {
+          messageId: activeChatId,
+          orderId: b["orderSn"],
+          orderStatus: g || b["afterSaleStatus"] || "",
+          refundAmount: q,
+          afterSaleStatus: r,
+          logisticsTrace: p,
+        });
+    });
+  khaiPddRuntimeLog("pdd-visible-order-extra-sync", {
+    orderSnTail: String(b["orderSn"])["slice"](-0x6),
+    hasRefundAmount: !!k,
+    hasVisibleRefundAmount: !!b["refundAmount"],
+    hasAfterSaleStatus: !!(f["afterSaleStatus"] || b["afterSaleStatus"] || cachedDetail?.["afterSaleStatus"]),
+    hasVisibleLogisticsTrace: !!visibleTrace,
+    hasLogisticsTrace: !!j,
+    detailFieldCount: orderFields["length"],
+  });
+}
+setInterval(() => {
+  khaiPddSyncVisibleOrderExtra()["catch"]((a) => {
+    khaiPddRuntimeLog("pdd-visible-order-extra-sync-error", { message: a?.["message"] || String(a) }, "warn");
+  });
+}, 0x5dc);
+
 
 // 监听页面dom加载完成
 document.addEventListener("DOMContentLoaded", () => {

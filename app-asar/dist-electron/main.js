@@ -24771,6 +24771,9 @@ ipcMain$1.on("setBottomLineReplyTimeRangeEnd", (e, t) => {
 ipcMain$1.on("change-pdd-show-robot-reply", (e, t) => {
   broadcastToOtherWindows(e, "change-pdd-show-robot-reply", "index", t);
 });
+ipcMain$1.on("change-pdd-hide-aftersale-status-card", (e, t) => {
+  broadcastToOtherWindows(e, "change-pdd-hide-aftersale-status-card", "index", !!t);
+});
 const require$2 = createRequire(import.meta.url), Database = require$2("better-sqlite3");
 let db;
 function getLocalDateTimeString() {
@@ -42164,21 +42167,45 @@ function khaiBuildPddAftersaleDetailMonitorScript() {
       if (document.getElementById("khai-pdd-order-extra-style")) return;
       const style = document.createElement("style");
       style.id = "khai-pdd-order-extra-style";
-      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:86px;right:36px;width:420px;max-width:calc(100vw - 72px);max-height:68vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:13px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16)}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:4px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:5px;padding:8px 10px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:230px;overflow:auto}";
+      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:86px;right:36px;width:420px;max-width:calc(100vw - 72px);max-height:68vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:13px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16);transition:right .18s ease,top .18s ease,width .18s ease,height .18s ease,padding .18s ease,border-radius .18s ease}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:4px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:5px;padding:8px 10px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:230px;overflow:auto}#khai-pdd-order-extra-panel.khai-order-extra-collapsed{top:var(--khai-pdd-order-extra-tab-top, 50%)!important;right:390px!important;width:28px!important;height:132px!important;max-width:none;max-height:none;padding:8px 4px;border-right:0;border-radius:7px 0 0 7px;cursor:pointer;touch-action:none;transform:translateY(-50%);overflow:hidden}#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-title{height:100%;margin-bottom:0;flex-direction:column;justify-content:center;writing-mode:vertical-rl;text-orientation:mixed}#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-close,#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-line{display:none}";
       document.head.appendChild(style);
     };
     const render = () => {
+      if (window.__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD) {
+        document.getElementById("khai-pdd-order-extra-panel")?.remove();
+        return null;
+      }
       ensureStyle();
       let panel = document.getElementById("khai-pdd-order-extra-panel");
       if (!panel) {
         panel = document.createElement("div");
         panel.id = "khai-pdd-order-extra-panel";
       }
-      panel.innerHTML = '<div class="khai-order-extra-title"><span>快回检测到售后状态</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "正在监听物流轨迹，点开右侧“查看全部”后会继续更新") + '</div></div>';
-      panel.querySelector(".khai-order-extra-close")?.addEventListener("click", () => panel.remove());
+      panel.__khaiRenderPanel = render;
+      const isExpanded = panel.getAttribute("data-khai-expanded") === "1";
+      panel.classList.toggle("khai-order-extra-collapsed", !isExpanded);
+      panel.innerHTML = '<div class="khai-order-extra-title"><span>' + (isExpanded ? "快回检测到售后状态" : "售后状态") + '</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "正在监听物流轨迹，点开右侧“查看全部”后会继续更新") + '</div></div>';
+      panel.querySelector(".khai-order-extra-close")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        panel.setAttribute("data-khai-expanded", "0");
+        render();
+      });
+      panel.onclick = isExpanded ? null : () => {
+        panel.setAttribute("data-khai-expanded", "1");
+        render();
+      };
+      if (!panel.__khaiOutsideClickBound) {
+        panel.__khaiOutsideClickBound = true;
+        document.addEventListener("click", (event) => {
+          const current = document.getElementById("khai-pdd-order-extra-panel");
+          if (!current || current.classList.contains("khai-order-extra-collapsed") || current.contains(event.target)) return;
+          current.setAttribute("data-khai-expanded", "0");
+          current.__khaiRenderPanel && current.__khaiRenderPanel();
+        }, true);
+      }
       document.body.appendChild(panel);
     };
-    render();
+    document.getElementById("khai-pdd-order-extra-panel")?.remove();
     return data;
   })()`;
 }
@@ -42187,20 +42214,48 @@ function khaiBuildPddOrderExtraRenderScript(e) {
   return `(() => {
     const data = ${t};
     if (!data || !data.orderSn) return false;
+    if (window.__KHAI_PDD_RUNTIME_AFTERSALE_CARD__) return true;
     const currentText = document.body && (document.body.innerText || document.body.textContent || "") || "";
     const existing = document.getElementById("khai-pdd-order-extra-panel");
     if (!currentText.includes(data.orderSn) && !(existing && (existing.innerText || "").includes(data.orderSn))) return false;
     const escapeHtml = (value) => String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
+    if (window.__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD) {
+      document.getElementById("khai-pdd-order-extra-panel")?.remove();
+      return false;
+    }
     if (!document.getElementById("khai-pdd-order-extra-style")) {
       const style = document.createElement("style");
       style.id = "khai-pdd-order-extra-style";
-      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:118px;right:390px;width:390px;max-width:calc(100vw - 430px);max-height:62vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:12px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16)}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:3px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:4px;padding:6px 8px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:180px;overflow:auto}";
+      style.textContent = "#khai-pdd-order-extra-panel{position:fixed;top:118px;right:390px;width:390px;max-width:calc(100vw - 430px);max-height:62vh;overflow:auto;z-index:2147483646;padding:12px 14px;background:#fff;border:1px solid #dbeafe;border-left:4px solid #3b82f6;border-radius:8px;color:#1f2937;font-size:12px;line-height:1.55;box-shadow:0 12px 34px rgba(15,23,42,.16);transition:right .18s ease,top .18s ease,width .18s ease,height .18s ease,padding .18s ease,border-radius .18s ease}#khai-pdd-order-extra-panel .khai-order-extra-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700;color:#2563eb}#khai-pdd-order-extra-panel .khai-order-extra-close{border:0;background:#eff6ff;color:#2563eb;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px}#khai-pdd-order-extra-panel .khai-order-extra-line{margin:3px 0;word-break:break-word}#khai-pdd-order-extra-panel .khai-order-extra-label{color:#6b7280}#khai-pdd-order-extra-panel .khai-order-extra-money{color:#ef4444;font-weight:700}#khai-pdd-order-extra-panel .khai-order-extra-trace{margin-top:4px;padding:6px 8px;background:#f8fafc;border-radius:4px;white-space:pre-wrap;color:#374151;max-height:180px;overflow:auto}#khai-pdd-order-extra-panel.khai-order-extra-collapsed{top:var(--khai-pdd-order-extra-tab-top, 50%)!important;right:390px!important;width:28px!important;height:132px!important;max-width:none;max-height:none;padding:8px 4px;border-right:0;border-radius:7px 0 0 7px;cursor:pointer;touch-action:none;transform:translateY(-50%);overflow:hidden}#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-title{height:100%;margin-bottom:0;flex-direction:column;justify-content:center;writing-mode:vertical-rl;text-orientation:mixed}#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-close,#khai-pdd-order-extra-panel.khai-order-extra-collapsed .khai-order-extra-line{display:none}";
       document.head.appendChild(style);
     }
     let panel = existing || document.createElement("div");
     panel.id = "khai-pdd-order-extra-panel";
-    panel.innerHTML = '<div class="khai-order-extra-title"><span>快回检测到售后状态</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "暂无物流轨迹") + '</div></div>';
-    panel.querySelector(".khai-order-extra-close")?.addEventListener("click", () => panel.remove());
+    const renderPanel = () => {
+      panel.__khaiRenderPanel = renderPanel;
+      const isExpanded = panel.getAttribute("data-khai-expanded") === "1";
+      panel.classList.toggle("khai-order-extra-collapsed", !isExpanded);
+      panel.innerHTML = '<div class="khai-order-extra-title"><span>' + (isExpanded ? "快回检测到售后状态" : "售后状态") + '</span><button class="khai-order-extra-close" type="button">关闭</button></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">订单编号：</span><span>' + escapeHtml(data.orderSn) + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">售后状态：</span><span>' + escapeHtml(data.afterSaleStatus || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">退款金额：</span><span class="khai-order-extra-money">' + escapeHtml(data.refundAmount || "获取中") + '</span></div><div class="khai-order-extra-line"><span class="khai-order-extra-label">物流轨迹：</span><div class="khai-order-extra-trace">' + escapeHtml(data.logisticsTrace || "暂无物流轨迹") + '</div></div>';
+      panel.querySelector(".khai-order-extra-close")?.addEventListener("click", (event) => {
+        event.stopPropagation();
+        panel.setAttribute("data-khai-expanded", "0");
+        renderPanel();
+      });
+      panel.onclick = isExpanded ? null : () => {
+        panel.setAttribute("data-khai-expanded", "1");
+        renderPanel();
+      };
+    };
+    if (!panel.__khaiOutsideClickBound) {
+      panel.__khaiOutsideClickBound = true;
+      document.addEventListener("click", (event) => {
+        const current = document.getElementById("khai-pdd-order-extra-panel");
+        if (!current || current.classList.contains("khai-order-extra-collapsed") || current.contains(event.target)) return;
+        current.setAttribute("data-khai-expanded", "0");
+        current.__khaiRenderPanel && current.__khaiRenderPanel();
+      }, true);
+    }
+    renderPanel();
     document.body.appendChild(panel);
     return true;
   })()`;

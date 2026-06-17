@@ -10311,6 +10311,12 @@ const Mi = Ae({
         },
         l = () => {
           J.postMessage("change-pdd-show-robot-reply", t.settings.PDDShowRobotReply);
+        },
+        p = () => {
+          J.postMessage(
+            "change-pdd-hide-aftersale-status-card",
+            t.settings.PDDHideAftersaleStatusCard,
+          );
         };
       return (e, o) => {
         const s = Mi,
@@ -10554,6 +10560,59 @@ const Mi = Ae({
                                   "span",
                                   { style: { color: "#ffb651" } },
                                   "开启后，官方机器人回复的信息不会重复弹出",
+                                  -1,
+                                ),
+                              ])),
+                          ]),
+                          _: 1,
+                        },
+                      ),
+                    ]),
+                    Ve("div", Ml, [
+                      _e(
+                        u,
+                        { "label-placement": "left" },
+                        {
+                          default: Le(() => [
+                            _e(
+                              d,
+                              { label: "关闭检测到售后状态卡片" },
+                              {
+                                default: Le(() => [
+                                  _e(
+                                    c,
+                                    {
+                                      value: Ue(t).settings.PDDHideAftersaleStatusCard,
+                                      "onUpdate:value": [
+                                        o[11] ||
+                                          (o[11] = (e) =>
+                                            (Ue(t).settings.PDDHideAftersaleStatusCard = e)),
+                                        p,
+                                      ],
+                                    },
+                                    null,
+                                    8,
+                                    ["value"],
+                                  ),
+                                ]),
+                                _: 1,
+                              },
+                            ),
+                          ]),
+                          _: 1,
+                        },
+                      ),
+                      _e(
+                        h,
+                        { type: "warning", bordered: !1 },
+                        {
+                          default: Le(() => [
+                            ...(o[12] ||
+                              (o[12] = [
+                                Ve(
+                                  "span",
+                                  { style: { color: "#ffb651" } },
+                                  "开启后，拼多多检测到售后状态的悬浮卡片不再显示",
                                   -1,
                                 ),
                               ])),

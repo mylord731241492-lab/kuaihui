@@ -6569,6 +6569,9 @@ const Tl = new (class {
             qt("change-volume", (e, t) => {
               u.settings.volume = t;
             }),
+            qt("change-pdd-hide-aftersale-status-card", (e, t) => {
+              u.settings.PDDHideAftersaleStatusCard = !!t;
+            }),
             qt("star", () => {
               Me.send("send-to-webcontents-view", { shopId: L.value, channel: "star", data: {} });
             }),

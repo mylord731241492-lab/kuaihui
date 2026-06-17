@@ -9,8 +9,13 @@ const files = {
   messageCss: "app-asar/dist/assets/index-DhfomVSO.css",
   todo: "app-asar/dist/assets/index-CBgyFkVF.js",
   todoCss: "app-asar/dist/assets/index-CrXcuUdk.css",
+  appStore: "app-asar/dist/assets/index-Ct5UuHQN.js",
   appMain: "app-asar/dist/assets/index-CGzMkKvq.js",
+  settings: "app-asar/dist/assets/changeMesssage-DDIKDCV-.js",
+  settingsUi: "app-asar/dist/assets/index-DjoMJELL.js",
   shop: "app-asar/dist/assets/index-wFlC9aUK.js",
+  pddRuntimeAsset: "app-asar/dist/assets/customer-BAHSo8oQ.cjs",
+  pddPreload: "app-asar/dist/preload-package/pdd/customer.cjs",
 };
 
 const read = (rel) => fs.readFileSync(path.join(root, rel), "utf8");
@@ -44,8 +49,13 @@ function runNodeCheck(rel) {
 runNodeCheck(files.main);
 runNodeCheck(files.message);
 runNodeCheck(files.todo);
+runNodeCheck(files.appStore);
 runNodeCheck(files.appMain);
+runNodeCheck(files.settings);
+runNodeCheck(files.settingsUi);
 runNodeCheck(files.shop);
+runNodeCheck(files.pddRuntimeAsset);
+runNodeCheck(files.pddPreload);
 
 ok("main creates message popup window", has(sources.main, "createMessageWindow("));
 ok("main creates todo popup window", has(sources.main, "createTodoListWindow()"));
@@ -81,6 +91,16 @@ ok("main popup debug shows every popup", has(sources.main, "showPopupDebugMode")
 ok("main popup debug simulates PDD robot notice", has(sources.main, "pddRobotCustomerMessage") && has(sources.main, "pddRobotRepliedMessage") && has(sources.main, '"get-ai-replied-message-api"') && has(sources.main, "本地模拟：拼多多自带机器人"));
 ok("main popup debug binds sample to real PDD shop", has(sources.main, "getPopupDebugShopSample") && has(sources.main, 't.platformType === "拼多多"') && has(sources.main, "Number(r.id)"));
 ok("main popup debug hides prompt windows", has(sources.main, "hidePopupDebugMode") && has(sources.main, "[popup-debug] hide all prompt windows"));
+ok("main persists offline test shops", has(sources.main, "OFFLINE_SHOP_STORAGE_KEY") && has(sources.main, "khai-offline-test-shops") && has(sources.main, "khai-offline-shops-updated"));
+ok("main blocks outbound offline requests", has(sources.main, "offlineBlockFilter") && has(sources.main, "[offline-test] blocked request"));
+ok("main skips updates in offline test mode", has(sources.main, "离线测试模式：跳过更新检测"));
+ok("main bridges PDD reported message list", has(sources.main, '"reported-messagelist"') && has(sources.main, 'broadcastToOtherWindows(e, "reported-messagelist"'));
+ok("main bridges PDD robot reply setting", has(sources.main, '"change-pdd-show-robot-reply"') && has(sources.main, 'broadcastToOtherWindows(e, "change-pdd-show-robot-reply"'));
+ok("main bridges PDD aftersale card setting", has(sources.main, '"change-pdd-hide-aftersale-status-card"') && has(sources.main, 'broadcastToOtherWindows(e, "change-pdd-hide-aftersale-status-card"'));
+ok("main injected aftersale monitor respects hide flag", has(sources.main, "__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD") && has(sources.main, 'document.getElementById("khai-pdd-order-extra-panel")?.remove()'));
+ok("main injected aftersale monitor avoids duplicate runtime card", has(sources.main, "__KHAI_PDD_RUNTIME_AFTERSALE_CARD__") && has(sources.main, "return data;"));
+ok("main injected aftersale card defaults to thin order-sidebar edge tab", has(sources.main, "khai-order-extra-collapsed") && has(sources.main, "right:390px!important;width:28px!important;height:132px!important"));
+ok("main injected aftersale card collapses on outside click", has(sources.main, "__khaiOutsideClickBound") && has(sources.main, "current.contains(event.target)") && has(sources.main, 'current.setAttribute("data-khai-expanded", "0")'));
 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
@@ -153,6 +173,30 @@ ok("app main shop drag disables native draggable", has(sources.appMain, "e.dragg
 ok("app main shop drag has no native drag/drop handlers", !has(sources.appMain, "KhaiMainShopOnDragStart") && !has(sources.appMain, "KhaiMainShopOnDragOver") && !has(sources.appMain, "KhaiMainShopOnDrop"));
 ok("app main shop drag has no document mouse/drag sorting listeners", !has(sources.appMain, 'document.addEventListener("mousedown", KhaiMainShopOnMouseDown') && !has(sources.appMain, 'document.addEventListener("dragstart", KhaiMainShop'));
 ok("app main shop avatar can start drag", !has(sources.appMain, 'closest("button,input,textarea,select,a,.n-switch,.n-button,.n-dropdown,.shop-logo-clickable")'));
+ok("app main renders PDD refund and logistics rows", has(sources.appMain, "KHAI_PDD_REFUND_ROW") && has(sources.appMain, "KHAI_PDD_TRACE_ROW") && has(sources.appMain, "order-logistics-trace"));
+ok("app main sends reported message list to main", has(sources.appMain, 'postMessage("reported-messagelist"'));
+ok("app store defaults aftersale card setting to visible", has(sources.appStore, "PDDHideAftersaleStatusCard: !1"));
+ok("app main syncs aftersale card setting", has(sources.appMain, '"change-pdd-hide-aftersale-status-card"') && has(sources.appMain, "PDDHideAftersaleStatusCard = !!t"));
+
+ok("settings persists PDD robot reply setting", has(sources.settings, '"change-pdd-show-robot-reply"') && has(sources.settings, "PDDShowRobotReply"));
+ok("settings persists PDD aftersale card setting", has(sources.settings, '"change-pdd-hide-aftersale-status-card"') && has(sources.settings, "PDDHideAftersaleStatusCard") && has(sources.settings, "change-pdd-hide-aftersale-status-card"));
+ok("settings UI exposes aftersale card switch", has(sources.settingsUi, "关闭检测到售后状态卡片") && has(sources.settingsUi, '"change-pdd-hide-aftersale-status-card"') && has(sources.settingsUi, "PDDHideAftersaleStatusCard"));
+
+ok("PDD preload toggles robot reply visibility", has(sources.pddPreload, '"change-pdd-show-robot-reply"') && has(sources.pddPreload, "CHANGE_PDD_SHOW_ROBOT_REPLY") && has(sources.pddPreload, "isPDDShowRobotReply"));
+ok("PDD preload receives aftersale card setting", has(sources.pddPreload, '"change-pdd-hide-aftersale-status-card"') && has(sources.pddPreload, "CHANGE_PDD_HIDE_AFTERSALE_STATUS_CARD") && has(sources.pddPreload, "__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"));
+ok("PDD preload detects offline and busy status", has(sources.pddPreload, '"offline"') && has(sources.pddPreload, "离线") && has(sources.pddPreload, "忙碌") && has(sources.pddPreload, '"shop-status-change"'));
+ok("PDD preload filters platform handled after-sale notices", has(sources.pddPreload, "平台客服已处理本次售后") && has(sources.pddPreload, "enter_manual_823_offline"));
+ok("PDD preload collects non-work-time messages", has(sources.pddPreload, "非工作时间留言") && has(sources.pddPreload, "timeNote"));
+ok("PDD preload keeps reply textarea resizing", has(sources.pddPreload, "khai-pdd-reply-resize-handle") && has(sources.pddPreload, "khai-pdd-reply-textarea-height"));
+ok("PDD preload renders order extra panel", has(sources.pddPreload, "khai-pdd-order-extra-panel") && has(sources.pddPreload, "pdd-visible-order-extra-sync") && has(sources.pddPreload, "khai-order-extra-resize"));
+ok("PDD preload defaults aftersale card to edge tab", has(sources.pddPreload, "khaiPddExpandedOrderExtraKey !== c") && has(sources.pddPreload, "售后状态") && has(sources.pddPreload, "writing-mode: vertical-rl"));
+ok("PDD preload collapses aftersale card on outside click", has(sources.pddPreload, "__khaiPddOutsideClickBound") && has(sources.pddPreload, 'm["contains"](l["target"])') && has(sources.pddPreload, 'khaiPddExpandedOrderExtraKey = ""'));
+ok("PDD preload has draggable thin aftersale edge tab", has(sources.pddPreload, "khaiPddBindOrderExtraPanelDrag") && has(sources.pddPreload, "khai-pdd-order-extra-tab-top") && has(sources.pddPreload, "width: 28px !important"));
+ok("PDD runtime asset uses visible conversation order sync", has(sources.pddRuntimeAsset, "khaiPddSyncVisibleOrderExtra") && has(sources.pddRuntimeAsset, "khaiPddGetActiveChatId") && has(sources.pddRuntimeAsset, "khaiPddReadVisibleOrderPanel"));
+ok("PDD runtime asset auto-fetches aftersale details", has(sources.pddRuntimeAsset, "khaiPddRequestAutoAftersaleDetail") && has(sources.pddRuntimeAsset, "khaiPddFindAftersaleRecordForOrder") && has(sources.pddRuntimeAsset, "khaiPddFetchAftersaleDetailByFrame"));
+ok("PDD runtime asset places thin aftersale tab at order sidebar edge", has(sources.pddRuntimeAsset, "right: 390px !important") && has(sources.pddRuntimeAsset, "width: 28px !important") && has(sources.pddRuntimeAsset, "height: 132px !important"));
+ok("PDD runtime asset supports vertical tab drag", has(sources.pddRuntimeAsset, "khaiPddBindOrderExtraPanelDrag") && has(sources.pddRuntimeAsset, "khai-pdd-order-extra-tab-top") && has(sources.pddRuntimeAsset, "__khaiPddTabDragSuppressClick"));
+ok("PDD runtime asset respects aftersale card setting", has(sources.pddRuntimeAsset, '"change-pdd-hide-aftersale-status-card"') && has(sources.pddRuntimeAsset, "PDDHideAftersaleStatusCard"));
 
 function moveToIndex(input, id, index) {
   const list = input.slice();
