@@ -6572,6 +6572,9 @@ const Tl = new (class {
             qt("change-pdd-hide-aftersale-status-card", (e, t) => {
               u.settings.PDDHideAftersaleStatusCard = !!t;
             }),
+            qt("change-open-single-popup-page", (e, t) => {
+              u.settings.OpenSinglePopupPage = !!t;
+            }),
             qt("star", () => {
               Me.send("send-to-webcontents-view", { shopId: L.value, channel: "star", data: {} });
             }),
@@ -6634,6 +6637,7 @@ const Tl = new (class {
             qt("set-auto-refresh", (e, t) => {
               u.autoRefresh = t;
             }),
+            Me.postMessage("change-open-single-popup-page", !!u.settings.OpenSinglePopupPage),
             Me.invoke("get-config-sync-snapshot").then((e) => {
               ((e) => {
                 e &&

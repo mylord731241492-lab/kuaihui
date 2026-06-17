@@ -10317,6 +10317,9 @@ const Mi = Ae({
             "change-pdd-hide-aftersale-status-card",
             t.settings.PDDHideAftersaleStatusCard,
           );
+        },
+        m = () => {
+          J.postMessage("change-open-single-popup-page", t.settings.OpenSinglePopupPage);
         };
       return (e, o) => {
         const s = Mi,
@@ -10613,6 +10616,58 @@ const Mi = Ae({
                                   "span",
                                   { style: { color: "#ffb651" } },
                                   "开启后，拼多多检测到售后状态的悬浮卡片不再显示",
+                                  -1,
+                                ),
+                              ])),
+                          ]),
+                          _: 1,
+                        },
+                      ),
+                    ]),
+                    Ve("div", Ml, [
+                      _e(
+                        u,
+                        { "label-placement": "left" },
+                        {
+                          default: Le(() => [
+                            _e(
+                              d,
+                              { label: "全局打开单个页面" },
+                              {
+                                default: Le(() => [
+                                  _e(
+                                    c,
+                                    {
+                                      value: Ue(t).settings.OpenSinglePopupPage,
+                                      "onUpdate:value": [
+                                        o[13] ||
+                                          (o[13] = (e) => (Ue(t).settings.OpenSinglePopupPage = e)),
+                                        m,
+                                      ],
+                                    },
+                                    null,
+                                    8,
+                                    ["value"],
+                                  ),
+                                ]),
+                                _: 1,
+                              },
+                            ),
+                          ]),
+                          _: 1,
+                        },
+                      ),
+                      _e(
+                        h,
+                        { type: "warning", bordered: !1 },
+                        {
+                          default: Le(() => [
+                            ...(o[14] ||
+                              (o[14] = [
+                                Ve(
+                                  "span",
+                                  { style: { color: "#ffb651" } },
+                                  "开启后，弹跳页面只保留一个窗口，后续打开会在该窗口中加载新页面",
                                   -1,
                                 ),
                               ])),

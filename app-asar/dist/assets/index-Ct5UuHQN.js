@@ -14597,6 +14597,7 @@ const Cg = new (class {
         doudianStatuOnline: !1,
         PDDShowRobotReply: !1,
         PDDHideAftersaleStatusCard: !1,
+        OpenSinglePopupPage: !1,
       },
       loginType: "server",
       autoRefresh: !1,

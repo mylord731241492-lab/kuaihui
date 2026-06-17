@@ -312,17 +312,30 @@ const ce = new (class {
           }),
             (je.length = 0));
         };
-      const KH_MESSAGE_SIZE_KEY = "khai-message-window-size",
+      let KH_MESSAGE_SIZE_KEY = "khai-message-window-size",
+        KH_MESSAGE_QUERY = new URLSearchParams(location.search),
         KH_MESSAGE_MIN_WIDTH = 320,
         KH_MESSAGE_MAX_WIDTH = 680,
         KH_MESSAGE_MIN_HEIGHT = 260,
         KH_MESSAGE_MAX_HEIGHT = 900,
         KH_MESSAGE_DEFAULT_WIDTH = 340,
-        KH_MESSAGE_DEFAULT_HEIGHT = 590,
+        KH_MESSAGE_DEFAULT_HEIGHT = 300,
+        KH_MESSAGE_SHRINK_WIDTH = 320,
+        KH_MESSAGE_SHRINK_HEIGHT = 260,
         KH_MESSAGE_CLAMP = (e, s, t) => Math.min(Math.max(Number(e) || s, s), t),
+        KH_MESSAGE_NORMALIZE_STATE = (e) => ("collapsed" === e || !0 === e ? "collapsed" : "expanded"),
         KH_MESSAGE_READ_SIZE = () => {
           try {
-            return JSON.parse(localStorage.getItem(KH_MESSAGE_SIZE_KEY) || "{}");
+            const e = JSON.parse(localStorage.getItem(KH_MESSAGE_SIZE_KEY) || "{}");
+            return e && "object" == typeof e
+              ? e.expanded || e.collapsed
+                ? e
+                : {
+                    state: KH_MESSAGE_NORMALIZE_STATE(e.state || e.collapsed),
+                    expanded: { width: e.width, height: e.height, manual: !!e.manual },
+                    collapsed: { width: KH_MESSAGE_SHRINK_WIDTH, height: KH_MESSAGE_SHRINK_HEIGHT, manual: !0 },
+                  }
+              : {};
           } catch {
             return {};
           }
@@ -330,19 +343,87 @@ const ce = new (class {
         KH_MESSAGE_SAVE_SIZE = (e) => {
           localStorage.setItem(KH_MESSAGE_SIZE_KEY, JSON.stringify(e));
         },
-        KH_MESSAGE_APPLY_SIZE = (e) => {
-          const s = {
-            width: KH_MESSAGE_CLAMP(e.width, KH_MESSAGE_DEFAULT_WIDTH, KH_MESSAGE_MAX_WIDTH),
-            height: KH_MESSAGE_CLAMP(e.height, KH_MESSAGE_DEFAULT_HEIGHT, KH_MESSAGE_MAX_HEIGHT),
+        KH_MESSAGE_STATE = "expanded",
+        KH_MESSAGE_GET_STORED_SIZE = (e, s = KH_MESSAGE_READ_SIZE()) => {
+          const t = "collapsed" === e,
+            a = (s && s[e]) || {},
+            o = t ? KH_MESSAGE_SHRINK_WIDTH : KH_MESSAGE_DEFAULT_WIDTH,
+            l = t ? KH_MESSAGE_SHRINK_HEIGHT : KH_MESSAGE_DEFAULT_HEIGHT;
+          return {
+            width: KH_MESSAGE_CLAMP(Number(a.width) || o, KH_MESSAGE_MIN_WIDTH, KH_MESSAGE_MAX_WIDTH),
+            height: KH_MESSAGE_CLAMP(Number(a.height) || l, KH_MESSAGE_MIN_HEIGHT, KH_MESSAGE_MAX_HEIGHT),
+            manual: !!a.manual,
           };
-          return D.postMessage("resize-message-window", s), s;
         },
-        KH_MESSAGE_AUTO_SIZE = () => {
-          const e = KH_MESSAGE_READ_SIZE();
-          if (e.manual) return KH_MESSAGE_APPLY_SIZE(e);
-          const s = Math.max(1, Me.value.length || x.value.length || xe.value.length || 1),
-            t = KH_MESSAGE_CLAMP(176 + Math.min(s, 8) * 58, 320, 720);
-          return KH_MESSAGE_APPLY_SIZE({ width: e.width || KH_MESSAGE_DEFAULT_WIDTH, height: t });
+        KH_MESSAGE_SAVE_STATE_SIZE = (e, s, t = {}) => {
+          const a = KH_MESSAGE_NORMALIZE_STATE(e),
+            o = KH_MESSAGE_READ_SIZE(),
+            l = {
+              state: a,
+              expanded: KH_MESSAGE_GET_STORED_SIZE("expanded", o),
+              collapsed: KH_MESSAGE_GET_STORED_SIZE("collapsed", o),
+            };
+          return (
+            (l[a] = {
+              width: KH_MESSAGE_CLAMP(s.width, KH_MESSAGE_MIN_WIDTH, KH_MESSAGE_MAX_WIDTH),
+              height: KH_MESSAGE_CLAMP(s.height, KH_MESSAGE_MIN_HEIGHT, KH_MESSAGE_MAX_HEIGHT),
+              manual: !!t.manual || !!(o[a] && o[a].manual),
+            }),
+            KH_MESSAGE_SAVE_SIZE(l),
+            l
+          );
+        },
+        KH_MESSAGE_GET_INITIAL_STATE = () => {
+          const e = KH_MESSAGE_QUERY.get("state");
+          return "collapsed" === e || "expanded" === e ? e : "1" === KH_MESSAGE_QUERY.get("collapsed") ? "collapsed" : KH_MESSAGE_NORMALIZE_STATE(KH_MESSAGE_READ_SIZE().state);
+        },
+        KH_MESSAGE_APPLY_SIZE = (e) => {
+          const t = KH_MESSAGE_NORMALIZE_STATE(e.state || e.collapsed || KH_MESSAGE_STATE);
+          const s = {
+            width: KH_MESSAGE_CLAMP(e.width, KH_MESSAGE_MIN_WIDTH, KH_MESSAGE_MAX_WIDTH),
+            height: KH_MESSAGE_CLAMP(e.height, KH_MESSAGE_MIN_HEIGHT, KH_MESSAGE_MAX_HEIGHT),
+          };
+          return D.postMessage("resize-message-window", { ...s, manual: !!e.manual, reset: !!e.reset, state: t, collapsed: "collapsed" === t }), s;
+        },
+        KH_MESSAGE_SYNC_HANDLE = (e) => {
+          e &&
+            ((e.dataset.collapsed = "collapsed" === KH_MESSAGE_STATE ? "1" : "0"),
+            (e.title = "collapsed" === KH_MESSAGE_STATE ? "点击展开消息通知，拖动调整缩放尺寸" : "点击缩放消息通知，拖动调整展开尺寸"));
+        },
+        KH_MESSAGE_EXPAND_SIZE = () => {
+          const e = KH_MESSAGE_READ_SIZE(),
+            s = KH_MESSAGE_GET_STORED_SIZE("expanded", e),
+            t = KH_MESSAGE_APPLY_SIZE({
+              ...s,
+              state: "expanded",
+              manual: !0,
+            });
+          (KH_MESSAGE_STATE = "expanded"), KH_MESSAGE_SAVE_STATE_SIZE("expanded", t, { manual: !0 }), KH_MESSAGE_SYNC_HANDLE(document.getElementById("khai-message-window-resize-handle"));
+        },
+        KH_MESSAGE_COLLAPSE_SIZE = () => {
+          const e = KH_MESSAGE_GET_STORED_SIZE("collapsed"),
+            s = KH_MESSAGE_APPLY_SIZE({
+              ...e,
+              state: "collapsed",
+              manual: !0,
+            });
+          (KH_MESSAGE_STATE = "collapsed"),
+            KH_MESSAGE_SAVE_STATE_SIZE("collapsed", s, { manual: !0 }),
+            KH_MESSAGE_SYNC_HANDLE(document.getElementById("khai-message-window-resize-handle"));
+        },
+        KH_MESSAGE_TOGGLE_SIZE = () => {
+          "collapsed" === KH_MESSAGE_STATE ? KH_MESSAGE_EXPAND_SIZE() : KH_MESSAGE_COLLAPSE_SIZE();
+        },
+        KH_MESSAGE_AUTO_SIZE = (e = !1) => {
+          const s = KH_MESSAGE_READ_SIZE();
+          if (!e) {
+            const e = KH_MESSAGE_GET_STORED_SIZE(KH_MESSAGE_STATE, s);
+            if (e.manual) return KH_MESSAGE_APPLY_SIZE({ ...e, state: KH_MESSAGE_STATE, manual: !0 });
+          }
+          const t = Math.max(1, Me.value.length || x.value.length || xe.value.length || 1),
+            a = KH_MESSAGE_CLAMP(170 + Math.min(t, 6) * 58, KH_MESSAGE_MIN_HEIGHT, 520),
+            o = KH_MESSAGE_APPLY_SIZE({ width: KH_MESSAGE_GET_STORED_SIZE("expanded", s).width || KH_MESSAGE_DEFAULT_WIDTH, height: a, state: "expanded", reset: !0 });
+          return (KH_MESSAGE_STATE = "expanded"), KH_MESSAGE_SAVE_STATE_SIZE("expanded", o, { manual: !0 }), KH_MESSAGE_SYNC_HANDLE(document.getElementById("khai-message-window-resize-handle")), o;
         },
         KH_MESSAGE_ENSURE_RESIZER = () => {
           A(() => {
@@ -352,7 +433,7 @@ const ce = new (class {
               const s = document.createElement("style");
               ((s.id = "khai-message-window-resize-style"),
                 (s.textContent =
-                  ".khai-message-window-resize-handle{position:absolute;right:8px;bottom:8px;width:22px;height:22px;border-radius:6px;cursor:nwse-resize;z-index:2147483647;background:rgba(37,99,235,.9);box-shadow:0 2px 8px rgba(37,99,235,.32);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;line-height:1;user-select:none;-webkit-app-region:no-drag}.khai-message-window-resize-handle:before{content:'↘'}"));
+                  ".khai-message-window-resize-handle{position:absolute;right:12px;top:4px;width:18px;height:18px;border:0;border-radius:4px;cursor:nwse-resize;z-index:2147483647;background:rgba(37,99,235,.88);box-shadow:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;line-height:1;user-select:none;-webkit-app-region:no-drag}.khai-message-window-resize-handle:before{content:'↙'}.khai-message-window-resize-handle[data-collapsed='1']:before{content:'↗'}"));
               document.head.appendChild(s);
             }
             let s = document.getElementById("khai-message-window-resize-handle");
@@ -360,37 +441,49 @@ const ce = new (class {
               ((s = document.createElement("div")),
               (s.id = "khai-message-window-resize-handle"),
               (s.className = "khai-message-window-resize-handle"),
-              (s.title = "拖动调整消息通知大小，双击恢复自动"),
+              (s.title = "点击收缩消息通知，拖动调整大小，双击恢复自动"),
               s.addEventListener("dblclick", (e) => {
-                e.preventDefault(), localStorage.removeItem(KH_MESSAGE_SIZE_KEY), KH_MESSAGE_AUTO_SIZE();
+                e.preventDefault(), localStorage.removeItem(KH_MESSAGE_SIZE_KEY), KH_MESSAGE_AUTO_SIZE(!0);
               }),
               s.addEventListener("mousedown", (e) => {
+                if (e.button !== 0) return;
                 e.preventDefault();
-                const s = e.clientX,
-                  t = e.clientY,
-                  a = window.innerWidth,
-                  o = window.innerHeight,
-                  l = (e) => {
-                    const l = KH_MESSAGE_APPLY_SIZE({
-                      width: a + e.clientX - s,
-                      height: o + e.clientY - t,
+                const t = e.clientX,
+                  a = e.clientY,
+                  o = window.innerWidth,
+                  l = window.innerHeight;
+                let n = !1;
+                const i = (e) => {
+                    if (!n && Math.abs(e.clientX - t) < 3 && Math.abs(e.clientY - a) < 3) return;
+                    n = !0;
+                    const i = KH_MESSAGE_APPLY_SIZE({
+                      width: o + e.clientX - t,
+                      height: l + e.clientY - a,
+                      manual: !0,
                     });
-                    KH_MESSAGE_SAVE_SIZE({ ...l, manual: !0 });
+                    KH_MESSAGE_SAVE_STATE_SIZE(KH_MESSAGE_STATE, i, { manual: !0 }), KH_MESSAGE_SYNC_HANDLE(s);
                   },
-                  n = () => {
+                  c = () => {
                     ((document.body.style.cursor = ""),
                       document.body.classList.remove("khai-message-window-resizing"),
-                      window.removeEventListener("mousemove", l, !0),
-                      window.removeEventListener("mouseup", n, !0));
+                      window.removeEventListener("mousemove", i, !0),
+                      window.removeEventListener("mouseup", c, !0),
+                      n && (s.__khaiMessageDragSuppressClick = !0));
                   };
                 ((document.body.style.cursor = "nwse-resize"),
                   document.body.classList.add("khai-message-window-resizing"),
-                  window.addEventListener("mousemove", l, !0),
-                  window.addEventListener("mouseup", n, !0));
+                  window.addEventListener("mousemove", i, !0),
+                  window.addEventListener("mouseup", c, !0));
               }));
             s.parentElement !== e && e.appendChild(s);
+            KH_MESSAGE_SYNC_HANDLE(s);
+            s.onclick = (e) => {
+              if (s.__khaiMessageDragSuppressClick) return void (s.__khaiMessageDragSuppressClick = !1);
+              e.preventDefault(), e.stopPropagation(), KH_MESSAGE_TOGGLE_SIZE();
+            };
           });
         };
+      KH_MESSAGE_STATE = KH_MESSAGE_GET_INITIAL_STATE();
       function Ee(e, t) {
         const a = s.value,
           o = e.timeout - a;
@@ -586,7 +679,7 @@ const ce = new (class {
       (n(
         () => x.value.length + xe.value.length,
         (e) => {
-          if ((KH_MESSAGE_AUTO_SIZE(), e > 0 ? Je() : Qe(), (e > 0 && !Ke.value) || (0 === e && Ke.value))) {
+          if ((e > 0 ? Je() : Qe(), (e > 0 && !Ke.value) || (0 === e && Ke.value))) {
             const s = e > 0;
             (D.postMessage("toggle-message-window", { platform: "all", show: s }), (Ke.value = s));
           }
@@ -604,7 +697,7 @@ const ce = new (class {
               (Ke.value = !1)));
         }),
         r(async () => {
-          (KH_MESSAGE_ENSURE_RESIZER(), KH_MESSAGE_AUTO_SIZE(), Je(), D.send("register-message-window"));
+          (KH_MESSAGE_ENSURE_RESIZER(), Je(), D.send("register-message-window"));
           const e = await D.invoke("get-config-sync-snapshot");
           ((null == e ? void 0 : e.bottomLineReply) &&
             (Ce.bottomLineReply = { ...Ce.bottomLineReply, ...e.bottomLineReply }),
@@ -1635,7 +1728,7 @@ const ce = new (class {
                     S(
                       d(
                         M,
-                        { class: "virtual-list", "item-size": 58, items: x.value, trigger: "none" },
+        { class: "virtual-list", "item-size": 46, items: x.value, trigger: "none" },
                         {
                           default: p(({ item: e }) => [
                             (h(),
@@ -1814,7 +1907,7 @@ const ce = new (class {
                     ),
                     d(
                       M,
-                      { class: "virtual-list", "item-size": 58, items: Me.value, trigger: "none" },
+                      { class: "virtual-list", "item-size": 46, items: Me.value, trigger: "none" },
                       {
                         default: p(({ item: e }) => [
                           (h(),

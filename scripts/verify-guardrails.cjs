@@ -69,6 +69,9 @@ ok("main supports AI replied popup", has(sources.main, 'case "ai":'));
 ok("main supports AI missed popup", has(sources.main, 'case "ai-missed":'));
 ok("main supports AI error popup", has(sources.main, 'case "ai-error":'));
 ok("main keeps message resize IPC", has(sources.main, '"resize-message-window"'));
+ok("main persists message popup bounds", has(sources.main, 'MESSAGE_WINDOW_BOUNDS_KEY = "messageWindowBounds"') && has(sources.main, "getStoredMessageWindowBounds") && has(sources.main, "store.set(MESSAGE_WINDOW_BOUNDS_KEY"));
+ok("main keeps two message popup size states", has(sources.main, "MESSAGE_WINDOW_EXPANDED_DEFAULT_BOUNDS") && has(sources.main, "MESSAGE_WINDOW_COLLAPSED_DEFAULT_BOUNDS") && has(sources.main, "normalizeMessageWindowStore") && has(sources.main, "expanded:") && has(sources.main, "collapsed:"));
+ok("main passes message popup current state into url", has(sources.main, "state=${s.state}") && has(sources.main, 'collapsed=${s.state === "collapsed" ? 1 : 0}'));
 ok("main keeps todo collapse IPC", has(sources.main, '"todoList-collapse"'));
 ok("main animates todo collapse bounds", has(sources.main, "animateTodoListBounds") && has(sources.main, "todoListBoundsAnimationTimer"));
 ok("main keeps todo floating move IPC", has(sources.main, '"move-todo-floating-window"'));
@@ -97,6 +100,10 @@ ok("main skips updates in offline test mode", has(sources.main, "离线测试模
 ok("main bridges PDD reported message list", has(sources.main, '"reported-messagelist"') && has(sources.main, 'broadcastToOtherWindows(e, "reported-messagelist"'));
 ok("main bridges PDD robot reply setting", has(sources.main, '"change-pdd-show-robot-reply"') && has(sources.main, 'broadcastToOtherWindows(e, "change-pdd-show-robot-reply"'));
 ok("main bridges PDD aftersale card setting", has(sources.main, '"change-pdd-hide-aftersale-status-card"') && has(sources.main, 'broadcastToOtherWindows(e, "change-pdd-hide-aftersale-status-card"'));
+ok("main bridges single popup page setting", has(sources.main, '"change-open-single-popup-page"') && has(sources.main, 'store.set("OpenSinglePopupPage"') && has(sources.main, 'broadcastToOtherWindows(e, "change-open-single-popup-page"'));
+ok("main reuses one generic popup page window", has(sources.main, "singlePopupPageWindow") && has(sources.main, "isOpenSinglePopupPageEnabled") && has(sources.main, "handleSinglePopupPageWindow") && has(sources.main, "singlePopupPageWindow.webContents.loadURL"));
+ok("main opens external http links in kernel popup page", has(sources.main, "openUrlInKernelPopupPage") && has(sources.main, "createKernelPopupPageWindow") && has(sources.main, "isHttpPopupUrl") && has(sources.main, "openUrlInKernelPopupPage(l, r);"));
+ok("main preserves popup opener session cookies", has(sources.main, "getSinglePopupPageSession") && has(sources.main, "n !== s") && has(sources.main, "rememberSinglePopupPageWindow(e)"));
 ok("main injected aftersale monitor respects hide flag", has(sources.main, "__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD") && has(sources.main, 'document.getElementById("khai-pdd-order-extra-panel")?.remove()'));
 ok("main injected aftersale monitor avoids duplicate runtime card", has(sources.main, "__KHAI_PDD_RUNTIME_AFTERSALE_CARD__") && has(sources.main, "return data;"));
 ok("main injected aftersale card defaults to thin order-sidebar edge tab", has(sources.main, "khai-order-extra-collapsed") && has(sources.main, "right:390px!important;width:28px!important;height:132px!important"));
@@ -105,7 +112,13 @@ ok("main injected aftersale card collapses on outside click", has(sources.main, 
 ok("message popup registers itself", has(sources.message, 'D.send("register-message-window")'));
 ok("message popup keeps auto show/hide IPC", has(sources.message, '"toggle-message-window"'));
 ok("message popup has resize handle", has(sources.message, "khai-message-window-resize-handle"));
+ok("message popup uses one combined click-drag handle", has(sources.message, "khai-message-window-resize-handle") && has(sources.message, "KH_MESSAGE_TOGGLE_SIZE") && has(sources.message, "KH_MESSAGE_COLLAPSE_SIZE") && has(sources.message, "KH_MESSAGE_EXPAND_SIZE") && !has(sources.message, "khai-message-window-shrink-btn"));
 ok("message popup keeps resize command", has(sources.message, '"resize-message-window"'));
+ok("message popup does not auto-resize on new notices", !has(sources.message, "if ((KH_MESSAGE_AUTO_SIZE(), e > 0 ? Je() : Qe()"));
+ok("message popup only persists manual/reset size changes", has(sources.message, "manual: !!e.manual") && has(sources.message, "reset: !!e.reset") && has(sources.message, "KH_MESSAGE_AUTO_SIZE(!0)"));
+ok("message popup clamps to min size when shrinking", has(sources.message, "KH_MESSAGE_MIN_WIDTH") && has(sources.message, "KH_MESSAGE_MIN_HEIGHT"));
+ok("message popup keeps independent expanded/collapsed sizes", has(sources.message, "KH_MESSAGE_STATE") && has(sources.message, "KH_MESSAGE_GET_STORED_SIZE") && has(sources.message, "KH_MESSAGE_SAVE_STATE_SIZE") && has(sources.message, "expanded:") && has(sources.message, "collapsed:"));
+ok("message popup reads initial current state from url", has(sources.message, 'KH_MESSAGE_QUERY.get("state")') && has(sources.message, 'KH_MESSAGE_QUERY.get("collapsed")') && has(sources.message, "KH_MESSAGE_GET_INITIAL_STATE"));
 ok("message popup keeps clear/remove AI replied channels", has(sources.message, "clear-ai-replied-message"));
 ok("message popup has right-click clear action", has(sources.message, "清理当前信息") && has(sources.message, "onContextmenu"));
 ok("message popup has one-click clear action", has(sources.message, "一键清理全部") && has(sources.message, "clear-all"));
@@ -176,11 +189,14 @@ ok("app main shop avatar can start drag", !has(sources.appMain, 'closest("button
 ok("app main renders PDD refund and logistics rows", has(sources.appMain, "KHAI_PDD_REFUND_ROW") && has(sources.appMain, "KHAI_PDD_TRACE_ROW") && has(sources.appMain, "order-logistics-trace"));
 ok("app main sends reported message list to main", has(sources.appMain, 'postMessage("reported-messagelist"'));
 ok("app store defaults aftersale card setting to visible", has(sources.appStore, "PDDHideAftersaleStatusCard: !1"));
+ok("app store defaults single popup page setting to off", has(sources.appStore, "OpenSinglePopupPage: !1"));
 ok("app main syncs aftersale card setting", has(sources.appMain, '"change-pdd-hide-aftersale-status-card"') && has(sources.appMain, "PDDHideAftersaleStatusCard = !!t"));
+ok("app main syncs single popup page setting", has(sources.appMain, '"change-open-single-popup-page"') && has(sources.appMain, "OpenSinglePopupPage = !!t") && has(sources.appMain, 'postMessage("change-open-single-popup-page"'));
 
 ok("settings persists PDD robot reply setting", has(sources.settings, '"change-pdd-show-robot-reply"') && has(sources.settings, "PDDShowRobotReply"));
 ok("settings persists PDD aftersale card setting", has(sources.settings, '"change-pdd-hide-aftersale-status-card"') && has(sources.settings, "PDDHideAftersaleStatusCard") && has(sources.settings, "change-pdd-hide-aftersale-status-card"));
 ok("settings UI exposes aftersale card switch", has(sources.settingsUi, "关闭检测到售后状态卡片") && has(sources.settingsUi, '"change-pdd-hide-aftersale-status-card"') && has(sources.settingsUi, "PDDHideAftersaleStatusCard"));
+ok("settings UI exposes single popup page switch", has(sources.settingsUi, "全局打开单个页面") && has(sources.settingsUi, '"change-open-single-popup-page"') && has(sources.settingsUi, "OpenSinglePopupPage"));
 
 ok("PDD preload toggles robot reply visibility", has(sources.pddPreload, '"change-pdd-show-robot-reply"') && has(sources.pddPreload, "CHANGE_PDD_SHOW_ROBOT_REPLY") && has(sources.pddPreload, "isPDDShowRobotReply"));
 ok("PDD preload receives aftersale card setting", has(sources.pddPreload, '"change-pdd-hide-aftersale-status-card"') && has(sources.pddPreload, "CHANGE_PDD_HIDE_AFTERSALE_STATUS_CARD") && has(sources.pddPreload, "__KHAI_PDD_HIDE_AFTERSALE_STATUS_CARD"));

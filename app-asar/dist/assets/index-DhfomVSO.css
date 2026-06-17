@@ -466,3 +466,227 @@
     font-size: 12px;
   }
 }
+.message-notification-container .header-card {
+  height: 28px;
+  padding: 7px 18px;
+}
+.message-notification-container .header-card .platform-title {
+  font-size: 13px;
+  line-height: 1;
+}
+.message-notification-container .status-tabs-container {
+  min-height: 46px;
+  border-bottom: 1px solid #edf1f7;
+}
+.message-notification-container .status-tabs-container .custom-tabs {
+  min-width: 0;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 46px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item .tab-text {
+  display: inline-block;
+  max-width: 54px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 18px;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item.active .tab-text {
+  font-weight: 700;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item.active:after {
+  height: 2px;
+  width: 28px;
+}
+.message-notification-container .status-tabs-container .sort-button-container {
+  width: 36px;
+  padding: 0 4px 0 0;
+  justify-content: center;
+}
+.message-notification-container .status-tabs-container .sort-button-container .n-button {
+  width: 28px;
+  height: 28px;
+}
+.message-notification-container .platform-tabs-container {
+  height: 40px;
+  padding: 0 8px;
+  overflow: hidden;
+}
+.message-notification-container .platform-tabs-container .n-tabs-nav,
+.message-notification-container .platform-tabs-container .n-tabs-nav-scroll-wrapper,
+.message-notification-container .platform-tabs-container .n-tabs-nav-scroll-content {
+  height: 40px;
+}
+.message-notification-container .platform-tabs-container .n-tabs-tab {
+  height: 40px;
+  padding: 0 10px !important;
+  font-size: 13px;
+  line-height: 40px;
+  white-space: nowrap;
+}
+.message-notification-container .platform-tabs-container .n-tabs-tab__label {
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.message-notification-container .message-list-container .virtual-list {
+  padding: 6px 6px 36px;
+}
+.message-notification-container .message-list-container .message-item-wrapper {
+  padding: 2px 0;
+}
+.message-notification-container .message-list-container .message-card {
+  border-color: #e8edf5;
+  border-radius: 6px;
+  box-shadow: none;
+}
+.message-notification-container .message-list-container .message-card:hover {
+  transform: none;
+  box-shadow: 0 2px 8px #00000014;
+}
+.message-notification-container .message-list-container .message-card .n-card__content,
+.message-notification-container .message-list-container .message-card :deep(.n-card__content) {
+  padding: 6px 8px !important;
+}
+.message-notification-container .message-list-container .message-card .n-space {
+  gap: 8px !important;
+}
+.message-notification-container .message-list-container .message-card .n-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+}
+.message-notification-container .message-list-container .message-content {
+  min-width: 0;
+}
+.message-notification-container .message-list-container .message-content .n-space {
+  gap: 5px !important;
+}
+.message-notification-container .message-list-container .message-content .username,
+.message-notification-container .message-list-container .message-content .n-ellipsis {
+  font-size: 13px;
+}
+.message-notification-container .message-list-container .message-content .message-text {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+.message-notification-container .message-list-container .n-tag {
+  --n-height: 22px;
+  max-width: 120px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.message-notification-container .message-list-container .n-tag__content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.message-notification-container .message-list-container .countdown-section,
+.message-notification-container .message-list-container .message-card > .n-card__content > .n-space > .n-space:last-child {
+  flex-shrink: 0;
+  max-width: 118px;
+  top: 0 !important;
+}
+.message-notification-container .message-list-container .message-card > .n-card__content > .n-space > .n-space:last-child .n-tag {
+  max-width: 102px;
+}
+.message-notification-container .badge .n-badge-sup,
+.badge .n-badge-sup {
+  transform: scale(0.9);
+  transform-origin: center;
+}
+.message-notification-container .header-card {
+  height: 26px;
+  padding: 6px 42px 6px 16px;
+}
+.message-notification-container .header-card .platform-title {
+  font-size: 13px;
+}
+.message-notification-container .status-tabs-container {
+  min-height: 40px;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item {
+  height: 40px;
+  padding: 0 3px;
+}
+.message-notification-container .status-tabs-container .custom-tabs .tab-item .tab-text {
+  max-width: 52px;
+  font-size: 12px;
+}
+.message-notification-container .status-tabs-container .sort-button-container {
+  width: 30px;
+}
+.message-notification-container .status-tabs-container .sort-button-container .n-button {
+  width: 24px;
+  height: 24px;
+}
+.message-notification-container .platform-tabs-container {
+  height: 34px;
+  padding: 0 6px;
+}
+.message-notification-container .platform-tabs-container .n-tabs-nav,
+.message-notification-container .platform-tabs-container .n-tabs-nav-scroll-wrapper,
+.message-notification-container .platform-tabs-container .n-tabs-nav-scroll-content {
+  height: 34px;
+}
+.message-notification-container .platform-tabs-container .n-tabs-tab {
+  height: 34px;
+  padding: 0 8px !important;
+  font-size: 12px;
+  line-height: 34px;
+}
+.message-notification-container .platform-tabs-container .n-tabs-tab__label {
+  max-width: 64px;
+}
+.message-notification-container .message-list-container .virtual-list {
+  padding: 4px 5px 6px;
+}
+.message-notification-container .message-list-container .message-item-wrapper {
+  padding: 1px 0;
+}
+.message-notification-container .message-list-container .message-card {
+  border-radius: 5px;
+}
+.message-notification-container .message-list-container .message-card .n-card__content,
+.message-notification-container .message-list-container .message-card :deep(.n-card__content) {
+  padding: 4px 7px !important;
+}
+.message-notification-container .message-list-container .message-card .n-space {
+  gap: 6px !important;
+}
+.message-notification-container .message-list-container .message-card .n-avatar {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+}
+.message-notification-container .message-list-container .message-content .n-space {
+  gap: 4px !important;
+}
+.message-notification-container .message-list-container .message-content .username,
+.message-notification-container .message-list-container .message-content .n-ellipsis {
+  font-size: 12px;
+}
+.message-notification-container .message-list-container .message-content .message-text {
+  margin-top: 1px;
+  font-size: 12px;
+  line-height: 1.18;
+}
+.message-notification-container .message-list-container .n-tag {
+  --n-height: 20px;
+  max-width: 108px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.message-notification-container .message-list-container .message-card > .n-card__content > .n-space > .n-space:last-child {
+  max-width: 104px;
+}
+.message-notification-container .message-list-container .message-card > .n-card__content > .n-space > .n-space:last-child .n-tag {
+  max-width: 92px;
+}

@@ -24774,6 +24774,9 @@ ipcMain$1.on("change-pdd-show-robot-reply", (e, t) => {
 ipcMain$1.on("change-pdd-hide-aftersale-status-card", (e, t) => {
   broadcastToOtherWindows(e, "change-pdd-hide-aftersale-status-card", "index", !!t);
 });
+ipcMain$1.on("change-open-single-popup-page", (e, t) => {
+  store.set("OpenSinglePopupPage", !!t), broadcastToOtherWindows(e, "change-open-single-popup-page", "index", !!t);
+});
 const require$2 = createRequire(import.meta.url), Database = require$2("better-sqlite3");
 let db;
 function getLocalDateTimeString() {
@@ -27001,11 +27004,12 @@ class createWindow {
   }
   // 创建消息窗口
   createMessageWindow(t, { x: r, y: n }) {
+    const s = getStoredMessageWindowBounds({ x: r, y: n });
     this.win = new BrowserWindow({
       icon: path$2.join(process.env.VITE_PUBLIC ?? "", "electron-vite.svg"),
       resizable: !0,
-      width: 340,
-      height: 590,
+      width: s.width,
+      height: s.height,
       minWidth: 320,
       minHeight: 260,
       alwaysOnTop: !0,
@@ -27027,9 +27031,9 @@ class createWindow {
         devTools: !0
         // 允许使用开发者工具
       },
-      x: r,
-      y: n
-    }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.win.setHasShadow(!1), this.loadURL(`message?platform=${t}`), this.win.hookWindowMessage(278, () => {
+      x: s.x,
+      y: s.y
+    }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.win.setHasShadow(!1), this.loadURL(`message?platform=${t}&state=${s.state}&collapsed=${s.state === "collapsed" ? 1 : 0}`), this.win.hookWindowMessage(278, () => {
       if (this.win) {
         this.win.setEnabled(!1);
         const s = setTimeout(() => {
@@ -27444,11 +27448,31 @@ ipcMain$1.handle("get-shop-windows-status", () => {
   }), e;
 });
 const PDDMessageWindow = new createWindow(), todoListWindow = new createWindow(), aiRepliedMessageWindow = new createWindow(), aiMissedMessageWindow = new createWindow(), aiErrorMessageWindow = new createWindow();
+const MESSAGE_WINDOW_BOUNDS_KEY = "messageWindowBounds", MESSAGE_WINDOW_EXPANDED_DEFAULT_BOUNDS = { width: 340, height: 300 }, MESSAGE_WINDOW_COLLAPSED_DEFAULT_BOUNDS = { width: 320, height: 260 };
 function setPromptWindowVisible(e, t, r = !0) {
   e && !e.isDestroyed() && (t && (e.show(), e.restore()), e.setOpacity(t ? 1 : 0), r && e.setIgnoreMouseEvents(!t, { forward: !0 }));
 }
 function clampPromptWindowSize(e, t, r) {
   return Math.min(Math.max(Number(e) || t, t), r);
+}
+function normalizeMessageWindowState(e) {
+  return e === "collapsed" || e === !0 ? "collapsed" : "expanded";
+}
+function normalizeMessageWindowStore(e = {}) {
+  const t = e && typeof e == "object" ? e : {}, r = normalizeMessageWindowState(t.state || t.collapsed), n = t.expanded || (t.width || t.height ? t : {}), s = t.collapsed && typeof t.collapsed == "object" ? t.collapsed : {};
+  return {
+    state: r,
+    expanded: { x: n.x ?? t.x, y: n.y ?? t.y, width: n.width ?? MESSAGE_WINDOW_EXPANDED_DEFAULT_BOUNDS.width, height: n.height ?? MESSAGE_WINDOW_EXPANDED_DEFAULT_BOUNDS.height },
+    collapsed: { x: s.x ?? t.x, y: s.y ?? t.y, width: s.width ?? MESSAGE_WINDOW_COLLAPSED_DEFAULT_BOUNDS.width, height: s.height ?? MESSAGE_WINDOW_COLLAPSED_DEFAULT_BOUNDS.height }
+  };
+}
+function clampMessageWindowBounds(e, t = {}) {
+  const r = screen.getPrimaryDisplay().workArea, n = clampPromptWindowSize(e.width, 320, Math.min(680, r.width - 40)), s = clampPromptWindowSize(e.height, 260, Math.min(900, r.height - 40)), i = clampPromptWindowSize(e.x ?? t.x, r.x, r.x + r.width - n), o = clampPromptWindowSize(e.y ?? t.y, r.y, r.y + r.height - s);
+  return { x: Math.round(i), y: Math.round(o), width: Math.round(n), height: Math.round(s) };
+}
+function getStoredMessageWindowBounds(e = {}) {
+  const t = normalizeMessageWindowStore(store.get(MESSAGE_WINDOW_BOUNDS_KEY) || {}), r = clampMessageWindowBounds(t[t.state], e);
+  return { ...r, state: t.state };
 }
 const openMessageWindow = () => {
   (!todoListWindow.win || todoListWindow.win.isDestroyed()) && todoListWindow.createTodoListWindow();
@@ -27635,7 +27659,9 @@ ipcMain$1.on("resize-message-window", (e, t = {}) => {
   if (!PDDMessageWindow.win || PDDMessageWindow.win.isDestroyed())
     return;
   const r = screen.getPrimaryDisplay().workArea, n = PDDMessageWindow.win.getBounds(), s = clampPromptWindowSize(t.width, 320, Math.min(680, r.width - 40)), i = clampPromptWindowSize(t.height, 260, Math.min(900, r.height - 40)), o = clampPromptWindowSize(n.x, r.x, r.x + r.width - s), a = clampPromptWindowSize(n.y, r.y, r.y + r.height - i);
-  khaiWriteRuntimeLog("popup", { event: "resize-message-window", data: { width: s, height: i, x: o, y: a } }), Log.info(`[listen-test][message-resize] width=${s}, height=${i}, x=${o}, y=${a}`);
+  const l = normalizeMessageWindowState(t.state || t.collapsed), c = normalizeMessageWindowStore(store.get(MESSAGE_WINDOW_BOUNDS_KEY) || {});
+  (t.manual || t.reset || t.collapsed || t.state) && ((c.state = l), (c[l] = { x: o, y: a, width: s, height: i }), store.set(MESSAGE_WINDOW_BOUNDS_KEY, c));
+  khaiWriteRuntimeLog("popup", { event: "resize-message-window", data: { state: l, width: s, height: i, x: o, y: a } }), Log.info(`[listen-test][message-resize] state=${l}, width=${s}, height=${i}, x=${o}, y=${a}`);
   PDDMessageWindow.win.setBounds({ x: o, y: a, width: s, height: i });
 });
 let todoListBoundsAnimationTimer = null;
@@ -27947,9 +27973,85 @@ function getCookieUrl(e) {
   const t = e.secure ? "https" : "http", r = e.domain || ".pinduoduo.com", n = e.path || "/";
   return `${t}://${r}${n}`;
 }
-let isCreated = !0, mainWebContents = null;
+let isCreated = !0, mainWebContents = null, singlePopupPageWindow = null;
+function isOpenSinglePopupPageEnabled() {
+  try {
+    return !!store.get("OpenSinglePopupPage", !1);
+  } catch {
+    return !1;
+  }
+}
+function getSinglePopupPageSession(e) {
+  try {
+    return e && !e.isDestroyed() ? e.webContents.session : null;
+  } catch {
+    return null;
+  }
+}
+function rememberSinglePopupPageWindow(e) {
+  if (!e || e.isDestroyed())
+    return;
+  singlePopupPageWindow = e, e.once("closed", () => {
+    singlePopupPageWindow === e && (singlePopupPageWindow = null);
+  });
+}
+function focusSinglePopupPageWindow(e) {
+  e && !e.isDestroyed() && (e.isMinimized() && e.restore(), e.show(), e.focus());
+}
+function isHttpPopupUrl(e) {
+  try {
+    const t = new URL(e);
+    return t.protocol === "http:" || t.protocol === "https:";
+  } catch {
+    return !1;
+  }
+}
+function createKernelPopupPageWindow(e) {
+  const t = new BrowserWindow({
+    icon: path$2.join(process.env.VITE_PUBLIC ?? "", "electron-vite.svg"),
+    width: 1280,
+    height: 860,
+    minWidth: 900,
+    minHeight: 640,
+    resizable: !0,
+    webPreferences: {
+      webSecurity: !1,
+      contextIsolation: !1,
+      nodeIntegration: !1,
+      devTools: process.env.NODE_ENV === "development"
+    }
+  });
+  return t.setMenuBarVisibility(!1), t.maximize(), t.loadURL(e).catch((r) => Log.error(`[single-popup] loadURL failed: ${r}`)), t;
+}
+function openUrlInKernelPopupPage(e, t = null) {
+  if (!e || !isHttpPopupUrl(e))
+    return e && shell$1.openExternal(e);
+  if (t && !t.isDestroyed())
+    return isOpenSinglePopupPageEnabled() && (singlePopupPageWindow && !singlePopupPageWindow.isDestroyed() && singlePopupPageWindow !== t && singlePopupPageWindow.close(), rememberSinglePopupPageWindow(t)), t.webContents.loadURL(e), void focusSinglePopupPageWindow(t);
+  if (isOpenSinglePopupPageEnabled()) {
+    if (singlePopupPageWindow && !singlePopupPageWindow.isDestroyed())
+      return singlePopupPageWindow.webContents.loadURL(e), void focusSinglePopupPageWindow(singlePopupPageWindow);
+    const t = createKernelPopupPageWindow(e);
+    return rememberSinglePopupPageWindow(t), void focusSinglePopupPageWindow(t);
+  }
+  focusSinglePopupPageWindow(createKernelPopupPageWindow(e));
+}
+function handleSinglePopupPageWindow(e, t = {}) {
+  if (!isOpenSinglePopupPageEnabled() || !e || e.isDestroyed())
+    return !1;
+  const r = (t == null ? void 0 : t.url) || e.webContents.getURL();
+  if (singlePopupPageWindow && !singlePopupPageWindow.isDestroyed() && singlePopupPageWindow !== e) {
+    const n = getSinglePopupPageSession(singlePopupPageWindow), s = getSinglePopupPageSession(e);
+    if (n && s && n !== s)
+      return singlePopupPageWindow.close(), rememberSinglePopupPageWindow(e), !1;
+    return r && r !== "about:blank" && singlePopupPageWindow.webContents.loadURL(r), focusSinglePopupPageWindow(singlePopupPageWindow), e.close(), !0;
+  }
+  return rememberSinglePopupPageWindow(e), !1;
+}
 app$1.on("web-contents-created", (e, t) => {
-  contextMenu(t), isCreated && (mainWebContents = t, isCreated = !1), t.on("did-create-window", async (r) => {
+  contextMenu(t), isCreated && (mainWebContents = t, isCreated = !1), t.on("did-create-window", async (r, details = {}) => {
+    if (handleSinglePopupPageWindow(r, details))
+      return;
     r.setMenu(null), r.maximize(), r.maximizable = !0, r.resizable = !0;
     let n = !1;
     const s = r.webContents;
@@ -27963,9 +28065,8 @@ app$1.on("web-contents-created", (e, t) => {
       console.log("childUrl=========", i);
       const o = await t.session.cookies.get({});
       if (i.includes("mobile.yangkeduo.com")) {
-        r.close();
         const a = new URL(i), u = new URLSearchParams(a.search).get("from"), l = decodeURIComponent(u);
-        shell$1.openExternal(l);
+        openUrlInKernelPopupPage(l, r);
       } else if (i.includes("https://fxg.jinritemai.com/index.html")) {
         for (const a of o) {
           if (a.httpOnly) continue;
