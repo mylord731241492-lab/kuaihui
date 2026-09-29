@@ -942,11 +942,13 @@ const insertScriptStr = function () {
               data: {
                 appCid: replyData.appCid,
                 msgId: replyData.msgId,
+                contentInfo: replyData.contentInfo,
+                receivedAt: Date.now(),
               },
             },
             "*",
           );
-          console.log("replyData.content", JSON.parse(replyData?.contentInfo?.content)?.data);
+          console.log("[XHS] 回执已交给本地发送关联检查");
           // let content = null
           //
           // try {
@@ -975,11 +977,7 @@ const insertScriptStr = function () {
           //   )
           // }
           // 发送回复成功消息给主进程
-          window.context_bridge.send("reply-customer-message", {
-            messageId: replyData.appCid, // 会话ID
-            msgId: replyData.msgId, // 消息ID
-            content: editCustomrMessage,
-          });
+          // The preload forwards this event after checking pending local sends.
           // ============ 关键：不要 return，让页面的 SDK 也能处理这个消息 ============
           // 页面的 SDK 会更新 notRepliedMsgCount 和清除倒计时
         }
@@ -1577,6 +1575,81 @@ const xhsSendAckQueue = new Map();
 // 等待中的回调：key=appCid
 const xhsSendAckWaiters = new Map();
 
+// JUHE_XHS_LOCAL_ACK_BEGIN
+// Platform receipts expose a conversation, message ID and text, but do not
+// prove which client request produced them. Keep local delivery unconfirmed.
+const juheXhsLocalReplies = new Map();
+const juheXhsSeenReceipts = new Map();
+function juheXhsAckText(contentInfo) {
+  if (!contentInfo || typeof contentInfo !== "object") return "";
+  const kind = contentInfo.contentType ?? contentInfo.content_type;
+  if (kind !== undefined && Number(kind) !== 1) return "";
+  let value = contentInfo.content;
+  for (let depth = 0; depth < 6; depth++) {
+    if (typeof value === "string") {
+      try { const parsed = JSON.parse(value); if (typeof parsed === "object" && parsed !== null) { value = parsed; continue; } }
+      catch {}
+      return value.length <= 20000 ? value : "";
+    }
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+    const type = value.content_type ?? value.type;
+    if (type !== undefined && Number(type) !== 1) return "";
+    value = value.data ?? value.content;
+  }
+  return "";
+}
+function juheBeginXhsLocalReply(message, chatId, replyText) {
+  xhsSendAckQueue.delete(chatId);
+  if (!/^[a-f0-9]{64}$/.test(message.juheAiMessageKey || "")) return null;
+  const previous = juheXhsLocalReplies.get(String(chatId));
+  previous?.resolve?.(null);
+  const task = {key:message.juheAiMessageKey, chatId:String(chatId), text:String(replyText || ""),
+    armedAt:0, expiresAt:Date.now()+60000, receipt:null, resolve:null, cancelled:false};
+  juheXhsLocalReplies.set(task.chatId, task);
+  return task;
+}
+function juheArmXhsLocalReply(task) { if (task) task.armedAt = Date.now(); }
+function juheRecordXhsReceipt(input) {
+  if (!input || typeof input !== "object" || !input.appCid || !input.msgId) return null;
+  const now = Date.now(), chatId = String(input.appCid), msgId = String(input.msgId);
+  const receivedAt = Number(input.receivedAt);
+  if (!Number.isFinite(receivedAt) || receivedAt > now+1000 || now-receivedAt > 60000) return null;
+  for (const [key, time] of juheXhsSeenReceipts) if (now-time > 60000) juheXhsSeenReceipts.delete(key);
+  const receiptKey = JSON.stringify([chatId,msgId]);
+  if (juheXhsSeenReceipts.has(receiptKey)) return null;
+  juheXhsSeenReceipts.set(receiptKey,now);
+  let task = juheXhsLocalReplies.get(chatId);
+  if (task && now > task.expiresAt) { task.resolve?.(null); juheXhsLocalReplies.delete(chatId); task = null; }
+  const text = juheXhsAckText(input.contentInfo);
+  const matches = !!(task && !task.cancelled && task.armedAt && receivedAt >= task.armedAt &&
+    task.text && text === task.text);
+  const receipt = {appCid:chatId,msgId,text,receivedAt,localMatched:matches,
+    juheAiMessageKey:matches ? task.key : "", juheAckVerified:false};
+  if (matches) { task.receipt = receipt; task.resolve?.(receipt); task.resolve = null; }
+  else if (task && text && receivedAt >= task.armedAt) {
+    // A different human reply takes priority over the waiting local AI send.
+    task.cancelled = true; task.resolve?.(null); task.resolve = null;
+  }
+  return receipt;
+}
+function juheWaitXhsLocalReceipt(task, timeout = 5000) {
+  if (!task || task.cancelled) return Promise.resolve(null);
+  if (task.receipt) return Promise.resolve(task.receipt);
+  return new Promise(resolve => {
+    const timer = setTimeout(() => { task.resolve = null; resolve(null); }, timeout);
+    task.resolve = receipt => { clearTimeout(timer); task.resolve = null; resolve(receipt); };
+  });
+}
+function juheForwardXhsReceipt(input) {
+  const receipt = juheRecordXhsReceipt(input);
+  if (!receipt) return;
+  pushXhsSendAck(receipt.appCid,receipt);
+  ipcRenderer.send("reply-customer-message", {
+    messageId:receipt.appCid, msgId:receipt.msgId, content:receipt.text,
+    ...(receipt.localMatched ? {isAiAutoReply:true,juheAiMessageKey:receipt.juheAiMessageKey,juheAckVerified:false} : {})
+  });
+}
+// JUHE_XHS_LOCAL_ACK_END
 function pushXhsSendAck(appCid, ackData) {
   if (!appCid) return;
 
@@ -1692,6 +1765,7 @@ safeIpcOn("reply-message", async (_, args) => {
       console.error("[XHS] 无法获取会话 ID:", message);
       continue;
     }
+    const juheLocalTask = juheBeginXhsLocalReply(message, chatId, replyContent);
     if (message.imageBase64 || message.imageUrl) {
       const imageSent = await sendImage({
         chatId,
@@ -1722,6 +1796,7 @@ safeIpcOn("reply-message", async (_, args) => {
     }
 
     console.log("[XHS] SDK 发送文本消息到会话:", chatId, "内容:", replyContent);
+    juheArmXhsLocalReply(juheLocalTask);
     if (replyContent) {
       window.postMessage(
         {
@@ -1739,15 +1814,17 @@ safeIpcOn("reply-message", async (_, args) => {
       );
     }
 
-    const ackList = await waitForXhsSendAckCount(chatId, expectedAckCount, 5000);
+    const juheLocalReceipt = juheLocalTask ? await juheWaitXhsLocalReceipt(juheLocalTask) : null;
+    const ackList = juheLocalTask ? (juheLocalReceipt ? [juheLocalReceipt] : []) : await waitForXhsSendAckCount(chatId, expectedAckCount, 5000);
     console.log("[XHS] 发送成功回执列表:", ackList);
-    if (ackList.length === expectedAckCount) {
+    if (juheLocalTask ? !!juheLocalReceipt : ackList.length === expectedAckCount) {
       ipcRenderer.send("get-customer-callback-result", {
         ...message,
         isAiInviteReply: message.isAiInviteReply,
         isReminderReply: message.isReminderReply,
         isBottomLineAutoReply: message.isBottomLineAutoReply || false,
         isAiAutoReply: !message.isBottomLineAutoReply,
+        ...(juheLocalTask ? {juheAckVerified:false,juheAckEvidence:{kind:"conversation-text-time",msgId:juheLocalReceipt.msgId,receivedAt:juheLocalReceipt.receivedAt}} : {}),
       });
     } else {
       console.error(
@@ -1889,10 +1966,7 @@ window.addEventListener("message", (event) => {
     xhsSellerId = sellerId;
   }
   if (event.data && event.data.type === "XHS_REPLY_SEND_SUCCESS") {
-    const appCid = event.data?.data?.appCid;
-    if (appCid) {
-      pushXhsSendAck(appCid, event.data.data);
-    }
+    juheForwardXhsReceipt(event.data.data);
   }
   if (event.data && event.data.type === "XHS_HOOK_SUCCESS") {
     ipcRenderer.send("xhs-hook-success", {
@@ -1914,7 +1988,8 @@ async function getGoodsList(args) {
     console.log("[XHS] 开始获取全部商品详情, args:", args);
 
     // 获取 seller_id（客服ID）
-    const sellerId = window._sellerId || "68b8e6e99265c7001527e9f1";
+    const sellerId = typeof args?.sellerId === "string" ? args.sellerId.trim() : "";
+    if (!/^[A-Za-z0-9_-]{1,120}$/.test(sellerId)) throw new Error("小红书店铺身份尚未取得，请刷新登录店铺后重试");
     console.log("[XHS] sellerId:", sellerId);
 
     // 第一步：获取商品列表第一页，获取总数

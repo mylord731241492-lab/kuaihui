@@ -1,0 +1,16 @@
+{
+  "name": "juhe-client-build",
+  "private": true,
+  "version": "3.8.4-juhe.6",
+  "description": "聚禾客服平台 Windows 客户端构建工具",
+  "scripts": {
+    "verify": "node scripts/verify-guardrails.cjs",
+    "preflight": "node scripts/check-build-inputs.cjs",
+    "build:win": "npm run preflight && npm run verify && electron-builder --config electron-builder.json --win nsis --x64 --publish never",
+    "build:dir": "npm run preflight && npm run verify && electron-builder --config electron-builder.json --win --x64 --dir --publish never"
+  },
+  "devDependencies": {
+    "electron": "34.0.0",
+    "electron-builder": "26.15.3"
+  }
+}

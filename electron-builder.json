@@ -1,0 +1,56 @@
+{
+  "appId": "com.niushidai.kuaihui.offline.kuaihui",
+  "productName": "聚禾客服平台",
+  "copyright": "Copyright © 2026 洛阳锦鸿技术有限公司",
+  "directories": {
+    "app": "app-asar",
+    "output": "release-3.8.4-juhe.6-candidate",
+    "buildResources": "build"
+  },
+  "electronVersion": "34.0.0",
+  "electronDist": "node_modules/electron/dist",
+  "asar": true,
+  "asarUnpack": [
+    "**/*.node"
+  ],
+  "files": [
+    "dist/**",
+    "dist-electron/**",
+    "package.json",
+    "!dist/builder-effective-config.yaml"
+  ],
+  "extraResources": [
+    {
+      "from": "electron/protobuf/protoFile",
+      "to": "protobuf/protoFile",
+      "filter": [
+        "*.proto"
+      ]
+    }
+  ],
+  "extraMetadata": {
+    "name": "kuaihui-offline-kuaihui",
+    "description": "聚禾客服平台",
+    "version": "3.8.4-juhe.6"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "app-asar/dist/assets/juhe-logo-mark.png",
+    "artifactName": "Juhe-Customer-Service-${version}-${arch}-Setup.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "shortcutName": "聚禾客服平台"
+  },
+  "publish": null
+}

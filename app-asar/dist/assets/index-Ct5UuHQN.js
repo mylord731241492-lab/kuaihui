@@ -14793,7 +14793,7 @@ const Cg = new (class {
           __vite__mapDeps([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]),
           import.meta.url,
         ),
-      meta: { keepAlive: !1, title: "快回- 登录" },
+      meta: { keepAlive: !1, title: "聚禾客服平台 - 登录" },
     },
     {
       path: "/index",
@@ -14808,7 +14808,7 @@ const Cg = new (class {
           ]),
           import.meta.url,
         ),
-      meta: { keepAlive: !1, title: "快回" },
+      meta: { keepAlive: !1, title: "聚禾客服平台" },
     },
     {
       path: "/afterSalesWorkbench",
@@ -17025,177 +17025,10 @@ const {
     getAdapter: qv,
     mergeConfig: Vv,
   } = kv,
-  { VITE_API_URL: Gv } = { VITE_API_URL: "http://khai.shihuib.cn/prod-api" },
+  { VITE_API_URL: Gv } = { VITE_API_URL: "http://127.0.0.1:47832/unsupported-legacy/prod-api" },
   { message: Xv } = ch(["message"]),
   Kv = kv.create({ baseURL: Gv, timeout: 12e4 });
-function Yv(e = {}) {
-  if (window.__KHAI_OFFLINE_TEST__) {
-    const r = String(e.url || "");
-    const n = window.__KHAI_OFFLINE_USER__ || {};
-    const i = (a) => Promise.resolve(a);
-    const offlineShopKey = "khai-offline-test-shops";
-    const readOfflineShops = () => {
-      try {
-        return JSON.parse(localStorage.getItem(offlineShopKey) || "[]");
-      } catch {
-        return [];
-      }
-    };
-    const dedupeOfflineShops = (a = []) => {
-      const s = [],
-        o = new Map();
-      for (const t of a) {
-        if (!t || typeof t != "object") {
-          s.push(t);
-          continue;
-        }
-        const r = String(t.id ?? ""),
-          n = String(t.platformShopId ?? ""),
-          l = n && n !== r ? `${t.platformType || ""}:${n}` : "";
-        if (!l) {
-          s.push(t);
-          continue;
-        }
-        if (!o.has(l)) o.set(l, s.length), s.push(t);
-        else {
-          const c = o.get(l),
-            d = s[c] || {};
-          s[c] = { ...d, ...t, id: t.id || d.id };
-        }
-      }
-      return s;
-    };
-    const writeOfflineShops = (a) => {
-      localStorage.setItem(offlineShopKey, JSON.stringify(dedupeOfflineShops(a)));
-    };
-    const normalizeOfflineShop = (a = {}) => {
-      const s = Date.now();
-      let o = Array.isArray(a.cookies) ? a.cookies : [];
-      if (!o.length && a.loginToken)
-        try {
-          o = JSON.parse(a.loginToken);
-        } catch {}
-      return {
-        id: a.id || s,
-        shopName: a.shopName || "离线测试店铺",
-        merchantName: a.merchantName || "离线测试商家",
-        customerName: a.customerName || a.kfNickName || "离线客服",
-        platformType: a.platformType || "4",
-        loginToken: a.loginToken || "[]",
-        loginUrl: a.loginUrl || "",
-        cookies: o,
-        loginStatus: !!a.loginStatus,
-        loginInfoStatus: !!a.loginInfoStatus,
-        shopStatus: a.shopStatus || "",
-        status: a.status ?? 0,
-        botStatus: a.botStatus ?? 0,
-        aiRecommendedReply: !!a.aiRecommendedReply,
-        autoSendAiReply: !!a.autoSendAiReply,
-        isBottomLineAutoReply: !!a.isBottomLineAutoReply,
-        remark: a.remark || "",
-        alias: a.alias || "",
-        platformShopId: a.platformShopId || String(a.id || s),
-        botId: a.botId || "",
-        botIndexId: a.botIndexId || a.indexId || "",
-        shopCategory: a.shopCategory || "",
-        knowledgeText: a.knowledgeText || "",
-        subAccountInfo: a.subAccountInfo || "",
-        baseqa: a.baseqa || "0",
-        loginExpiredWarning: !1,
-        isWssConnectClose: !1,
-        isAigood: a.isAigood || 0,
-      };
-    };
-    const upsertOfflineShop = (a = {}) => {
-      const s = readOfflineShops();
-      const o = normalizeOfflineShop(a);
-      const t = s.findIndex((r) => Number(r.id) === Number(o.id));
-      t >= 0 ? (s[t] = normalizeOfflineShop({ ...s[t], ...a, id: o.id })) : s.unshift(o);
-      writeOfflineShops(s);
-      return t >= 0 ? s[t] : o;
-    };
-    if (r.includes("/cline/getuserinfo")) return i({ ...n });
-    if (r.includes("/cline/shop/Alllist")) {
-      const a = dedupeOfflineShops(readOfflineShops());
-      writeOfflineShops(a);
-      return i(a);
-    }
-    if (r.includes("/cline/shop/app/list")) return i([]);
-    if (r.includes("/cline/shop/app/updateLoginUrlToken")) {
-      const a = upsertOfflineShop({ ...(e.data || {}), loginStatus: !0, loginInfoStatus: !0 });
-      return i(a);
-    }
-    if (r.includes("/cline/shop/batchupdateshop")) {
-      const a = Array.isArray(e.data) ? e.data : [e.data || {}],
-        s = a.map((o) => upsertOfflineShop(o));
-      return i(Array.isArray(e.data) ? s : s[0] || {});
-    }
-    if (r === "/cline/shop" && String(e.method || "get").toLowerCase() === "post") {
-      const a = readOfflineShops();
-      const s = normalizeOfflineShop({
-        ...(e.data || {}),
-        id: Math.max(1, ...a.map((o) => Number(o.id) || 0)) + 1,
-      });
-      a.unshift(s);
-      writeOfflineShops(a);
-      return i(s);
-    }
-    if (r === "/cline/shop" && ["put", "PUT"].includes(String(e.method || "get"))) {
-      return i(upsertOfflineShop(e.data || {}));
-    }
-    if (r.startsWith("/cline/shop/") && String(e.method || "get").toLowerCase() === "delete") {
-      const a = Number(r.split("/").pop());
-      writeOfflineShops(readOfflineShops().filter((s) => Number(s.id) !== a));
-      return i({});
-    }
-    if (r.startsWith("/cline/shop/")) {
-      const a = Number(r.split("/").pop());
-      return i(readOfflineShops().find((s) => Number(s.id) === a) || {});
-    }
-    if (r.includes("/system/notice/noticelist")) return i([]);
-    if (r.includes("/system/dict/data/type/sys_version")) return i([]);
-    if (r.includes("/airobot/config/list")) return i([]);
-    if (r.includes("airobot/config/info")) return i({});
-    if (r.includes("/fallback/config/list")) return i([]);
-    if (r.includes("/fallback/config")) return i({});
-    if (["post", "put", "delete"].includes(String(e.method || "get").toLowerCase())) return i({});
-    return i([]);
-  }
-  return new Promise((o, t) => {
-    e.headers = {
-      ...(e.headers || {}),
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
-    };
-    if ("get" === (e.method || "get").toLowerCase()) {
-      const o = e.url || "",
-        t = o.includes("?") ? "&" : "?";
-      e.url = `${o}${t}_t=${Date.now()}`;
-    }
-    Kv(e)
-      .then((e) => {
-        const { code: r, data: n, token: i, rows: a } = e.data;
-        switch (r) {
-          case 200:
-            return (i && nx().setToken(i), o(n || a));
-          case 401:
-            return (
-              Xv.error("登录已过期或者在其他设备登录，请重新登录"),
-              nx().logout(),
-              Rm.send("delete-all-shop"),
-              t(e.data)
-            );
-          default:
-            return t(e.data);
-        }
-      })
-      .catch((e) => {
-        t(e);
-      })
-      .finally();
-  });
-}
+function Yv(e = {}) { return window.juheLegacyRequest(e); }
 Kv.interceptors.request.use((e) => {
   var o;
   const t = nx().token;
@@ -17206,7 +17039,7 @@ Kv.interceptors.request.use((e) => {
     e
   );
 });
-const Zv = { VITE_API_URL: "http://khai.shihuib.cn/prod-api" },
+const Zv = { VITE_API_URL: "http://127.0.0.1:47832/unsupported-legacy/prod-api" },
   { VITE_API_URL: Jv } = Zv,
   Qv = async (e) => {
     const { VITE_API_URL: o } = Zv,
@@ -17329,23 +17162,47 @@ const kC = async (e) => await Yv({ method: "post", url: "/bus/customer", data: e
     await Yv({ method: "put", url: "/bus/employeemonthSummary/updateStatus", data: e }),
   ZC = async (e) =>
     await Yv({ method: "put", url: "/bus/workOrderMonthSummary/updateStatus", data: e }),
-  JC = async () => await Yv({ method: "get", url: "/airobot/config/list" });
-function QC(e) {
-  return Yv({ url: "airobot/config/info", method: "get", params: e });
+  JC = async () => {
+    const snapshot = await window.juheLocalAiCall("snapshot");
+    const rows = [];
+    if (snapshot.globalConfig) rows.push({ configType: 1, configContent: JSON.stringify(snapshot.globalConfig) });
+    for (const [shopId, config] of Object.entries(snapshot.singleShopConfig || {})) {
+      rows.push({ configType: 2, shopId, configContent: JSON.stringify(config) });
+    }
+    return rows;
+  };
+async function QC(e = {}) {
+  const singleShop = Number(e.configType) === 2;
+  if (singleShop && (e.shopId == null || String(e.shopId).trim() === "")) throw new Error("请先选择店铺");
+  const config = await window.juheLocalAiCall("config-get", singleShop ? { shopId: e.shopId } : {});
+  return { configType: singleShop ? 2 : 1, shopId: e.shopId, configContent: config == null ? null : JSON.stringify(config) };
 }
 function ex(e) {
   return Yv({ url: "/fallback/config", method: "get", params: e });
 }
 const ox = async () => await Yv({ method: "get", url: "/fallback/config/list" });
-function tx(e) {
-  return Yv({ url: "airobot/config?saveType=1", method: "post", data: e });
+async function tx(e) {
+  const entries = Array.isArray(e) ? e : [e];
+  const payloads = entries.map((entry) => {
+    if (!entry || ![1, 2].includes(Number(entry.configType))) throw new Error("AI配置类型无效");
+    const config = typeof entry.configContent === "string" ? JSON.parse(entry.configContent) : entry.configContent;
+    if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("AI配置内容无效");
+    if (Number(entry.configType) === 2) {
+      if (entry.shopId == null || String(entry.shopId).trim() === "") throw new Error("请先选择店铺");
+      return { shopId: entry.shopId, config };
+    }
+    return { config };
+  });
+  const saved = [];
+  for (const payload of payloads) saved.push(await window.juheLocalAiCall("config-save", payload));
+  return saved;
 }
 function rx(e) {
   return Yv({ url: "/fallback/config", method: "post", data: e });
 }
 const nx = M("user", {
     state: () => ({
-      token: window.__KHAI_OFFLINE_TEST__ ? "offline-test-token" : "",
+      token: window.__JUHE_USER__ ? "juhe-session" : "",
       loginForm: {
         phone: "",
         username: "",
@@ -17354,8 +17211,8 @@ const nx = M("user", {
         loginMode: "phone",
         userServiceAgreement: !1,
       },
-      userInfo: window.__KHAI_OFFLINE_TEST__
-        ? { ...window.__KHAI_OFFLINE_USER__ }
+      userInfo: window.__JUHE_USER__
+        ? { ...window.__JUHE_USER__ }
         : {
             remark: "",
             userId: 0,
@@ -17394,15 +17251,12 @@ const nx = M("user", {
                 Rm.send("set-user-info", bg.deepClone({ ...this.userInfo, token: this.token })),
                 e());
             })
-            .catch(() => {
-              o();
+            .catch((error) => {
+              o(error);
             });
         });
       },
-      logout() {
-        setTimeout(() => {
-          ((this.token = window.__KHAI_OFFLINE_TEST__ ? "offline-test-token" : ""), Tg.replace({ path: window.__KHAI_OFFLINE_TEST__ ? "/index" : "/login" }), Rm.send("logout"));
-        }, 500);
+      logout() { this.token = ''; require('electron').ipcRenderer.invoke('juhe-auth:call', 'logout');
       },
     },
     getters: {

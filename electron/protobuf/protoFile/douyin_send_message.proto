@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package dy;
+
+// 根消息类型
+message Root {
+    SubMessage field8 = 8;
+}
+
+// 更深层的嵌套消息类型
+message SubMessage {
+    Item field100 = 100;
+}
+
+message Item {
+    int64 field3 = 3;
+    string field4 = 4;
+}

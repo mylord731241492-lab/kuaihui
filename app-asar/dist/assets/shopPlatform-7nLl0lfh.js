@@ -1267,8 +1267,8 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
   ho = { class: "header-container" },
   po = { class: "user-info-section" },
   mo = { class: "flex items-center space-x-3" },
-  fo = { class: "text-xs text-gray-400 mr-2", style: { color: "#ffffff" } },
-  vo = { class: "ai-power-orb mr-3" },
+  fo = { class: "text-xs text-gray-400 mr-2 juhe-brand-version", style: { color: "#ffffff" } },
+  vo = { class: "ai-power-orb mr-3 juhe-brand-power" },
   go = { class: "orb-container" },
   bo = { class: "orb-inner" },
   yo = { class: "power-text" },
@@ -1290,7 +1290,17 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
   Uo = { class: "eye-icon-container" },
   $o = { class: "blue-circle" },
   Ro = { id: "notification-icon-placeholder", class: "notification-icon-placeholder" },
-  Eo = { class: "user-info-display" },
+  Eo = {
+    id: "juhe-user-status-entry", class: "user-info-display", role: "button", tabindex: 0,
+    title: "用户状态", "aria-label": "用户状态：账号、授权与设备管理",
+    onClick: () => window.juheOpenAuth?.(),
+    onKeydown: (event) => {
+      if(event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        if(!event.repeat) window.juheOpenAuth?.();
+      }
+    },
+  },
   Oo = { class: "flex items-center space-x-3" },
   Ao = { key: 1, class: "w-[32px] h-[32px] rounded-full", src: Ae, alt: "" },
   Do = { class: "flex flex-col" },
@@ -1440,13 +1450,6 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
             Z("clickMenu", o);
           },
           X = _(() => I.noShowMenu),
-          K = async () => {
-            (L().catch(() => {}),
-              f.clearAllMessages(),
-              await k.invoke("logout"),
-              v.logout(),
-              T && (clearInterval(T), (T = null)));
-          },
           Q = () => {
             Z("clickMenu", { key: "shopJj" });
           };
@@ -1461,7 +1464,6 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
             const t = ae,
               c = de,
               u = ie,
-              p = ee,
               f = Te;
             return (
               $(),
@@ -1470,7 +1472,21 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
                   U("div", po, [
                     U("div", mo, [
                       o[13] ||
-                        (o[13] = U("img", { src: Oe, alt: "", class: "w-[172px]" }, null, -1)),
+                        (o[13] = U(
+                          "div",
+                          { class: "juhe-brand-lockup" },
+                          [
+                            U("img", {
+                              src: new URL("juhe-logo-mark.png", import.meta.url).href,
+                              alt: "",
+                              width: "40",
+                              height: "40",
+                              class: "juhe-brand-logo",
+                            }),
+                            U("span", { class: "juhe-brand-wordmark" }, "聚禾客服平台"),
+                          ],
+                          -1,
+                        )),
                       U("span", fo, "v" + q(V(b)), 1),
                       U("div", vo, [
                         O(
@@ -1818,6 +1834,7 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
                                   : ($(), M("img", Ao)),
                                 U("div", Do, [
                                   U("div", Vo, [
+                                    U("span", { class: "juhe-user-status-label" }, "用户状态"),
                                     U(
                                       "span",
                                       qo,
@@ -1825,32 +1842,16 @@ const Je = { key: 0, width: "20", height: "20", viewBox: "0 0 24 24", fill: "cur
                                       1,
                                     ),
                                   ]),
-                                  O(
-                                    p,
-                                    {
-                                      trigger: "hover",
-                                      placement: "left-start",
-                                      options: [{ label: "退出登录", key: "logout" }],
-                                      onSelect: K,
-                                    },
-                                    {
-                                      default: A(() => [
-                                        U(
-                                          "div",
-                                          Ho,
-                                          " 到期时间：" +
-                                            q(
-                                              V(v).userInfo.expireTime
-                                                ? V(le)(V(v).userInfo.expireTime).format(
-                                                    "YYYY-MM-DD",
-                                                  )
-                                                : "∞",
-                                            ),
-                                          1,
-                                        ),
-                                      ]),
-                                      _: 1,
-                                    },
+                                  U(
+                                    "div",
+                                    Ho,
+                                    " 到期时间：" +
+                                      q(
+                                        V(v).userInfo.expireTime
+                                          ? V(le)(V(v).userInfo.expireTime).format("YYYY-MM-DD")
+                                          : "∞",
+                                      ),
+                                    1,
                                   ),
                                 ]),
                               ]),

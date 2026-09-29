@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package b;
+
+// 根消息类型
+message Root {
+  int32 field1 = 1;
+  int32 field2 = 2;
+  int32 field3 = 3;
+  string field4 = 4;
+  int64 field5 = 5;
+  SubMessage field6 = 6;
+  string field7 = 7;
+  int64 field10 = 10;
+  int64 field11 = 11;
+}
+
+// 嵌套消息类型
+message SubMessage {
+  SubSubMessage field2041 = 2041;
+}
+
+// 更深层的嵌套消息类型
+message SubSubMessage {
+  repeated Item items = 1;
+  int32 field2 = 2;
+  int32 field3 = 3;
+}
+
+// 包含多个字段的复杂项
+message Item {
+  int32 field1 = 1;
+  Message field2 = 2;
+  repeated ExtraField extra_fields = 9;
+  int64 field10 = 10;
+  int64 field11 = 11;
+  int64 field12 = 12;
+  int64 field13 = 13;
+  string field14 = 14;
+  int32 field17 = 17;
+  int64 field20 = 20;
+}
+
+// 包含两个字段的额外字段
+message ExtraField {
+  string key = 1;
+  string value = 2;
+}
+
+message ExtraField2 {
+  string nickname = 5;
+  string avatar = 8;
+}
+
+// 另一个包含多个字段的消息
+message Message {
+  string field1 = 1;
+  int32 field2 = 2;
+  int64 field3 = 3;
+  int64 field4 = 4;
+  int64 field5 = 5;
+  int32 field6 = 6;
+  int64 field7 = 7;
+  string field8 = 8;
+  repeated ExtraField extra_fields = 9;
+  int64 field10 = 10;
+}

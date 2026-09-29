@@ -219,15 +219,11 @@ const z = { class: "modal-container" },
                   await n(a);
                   const l = { ...fe.value };
                   ((ce.singleShopAiReplyConfig[ye.value] = l),
-                    s.postMessage("save-single-shop-ai-config", {
-                      shopId: ye.value,
-                      config: t.deepClone(l),
-                    }),
                     me.value && (me.value.subAccountInfo = fe.value.subAccount || ""),
                     v.success("保存成功"),
                     we());
                 } catch (a) {
-                  ((fe.value.isEnabled = !e), v.error("保存失败，请稍后重试"));
+                  v.error(`保存失败，修改已保留：${a?.msg || a?.message || "请稍后重试"}`);
                 } finally {
                   ge.value = !1;
                 }
@@ -254,7 +250,7 @@ const z = { class: "modal-container" },
                       (null == a ? void 0 : a.configContent) && "string" == typeof a.configContent
                         ? JSON.parse(a.configContent)
                         : null,
-                    s = Ie(l),
+                    s = Ie(l || e),
                     i = l && "object" == typeof l && ("isEnabled" in l || "isEnabled" in l);
                   fe.value = {
                     ...s,
@@ -378,9 +374,9 @@ const z = { class: "modal-container" },
                               f(
                                 "span",
                                 Z,
-                                "AI回复将以线上先行Beta版(先行测试体验版)模型进行回复(功能上有稍许差异,功能更先进,稳定性稍微比正式版稍低)",
+                                "本地接入统一使用当前模型和知识检索；此选项保留旧版偏好。",
                               ))
-                            : (W(), f("span", q, "AI回复将以线上稳定版模型进行回复(更加稳定可靠)")),
+                            : (W(), f("span", q, "本地接入统一使用当前模型和知识检索；此选项保留旧版偏好。")),
                         ]),
                       ]),
                     ]),
@@ -415,10 +411,10 @@ const z = { class: "modal-container" },
                             { class: "section-tip" },
                             [
                               b("strong", null, "AI全自动接待："),
-                              S("AI 会根据客户的消息进行回复"),
+                              S("可自动回复普通问候；店铺、商品与订单问题依据本地资料回答，缺少依据转人工。"),
                               b("br"),
                               b("strong", null, "AI人机协同："),
-                              S("AI 会根据客户的消息进行回复，如果 AI 无法回答，则转接到人工客服 "),
+                              S("有本地知识、商品或订单依据时回复；缺少依据转人工。"),
                             ],
                             -1,
                           )),

@@ -3514,6 +3514,13 @@ const preloadOrderAndGoodsByNeedOrder = async (item) => {
   }
 };
 
+let juhePddLastRequestId = 0;
+function juheNextPddRequestId() {
+  const next = Math.max(Date.now() * 1000, juhePddLastRequestId + 1);
+  if (!Number.isSafeInteger(next)) throw Error("无法生成有效的消息请求编号");
+  juhePddLastRequestId = next;
+  return next;
+}
 safeIpcOn("reply-message", (_, args) => {
   let data = [];
   try {
@@ -3533,7 +3540,7 @@ safeIpcOn("reply-message", (_, args) => {
     if (sendInsert && data[0].messageId) {
       // 发送
       const item = data[0];
-      const time = Date.now();
+      const time = juheNextPddRequestId();
       const replyResult = {
         ...item,
         messageId: item.messageId || item.userId,
@@ -3542,6 +3549,11 @@ safeIpcOn("reply-message", (_, args) => {
         isBottomLineAutoReply: item.isBottomLineAutoReply || false,
         isReminderReply: item?.isReminderReply || false,
         isAiInviteReply: item?.isAiInviteReply || false,
+        ...(item.juheAiMessageKey ? {
+          juheAiRequestId: time,
+          juheAiSendToken: String(time) + ":" + item.juheAiMessageKey,
+          juheAckVerified: false,
+        } : {}),
       };
       if (data[0]?.imageBase64 || data[0]?.imageUrl) {
         if (data[0]?.imageBase64) {
@@ -3584,7 +3596,7 @@ safeIpcOn("reply-message", (_, args) => {
                 from: {
                   role: "mall_cs",
                 },
-                ts: time,
+                ts: Date.now(),
                 content: data[0].replyContent,
                 msg_id: null,
                 type: 0,
@@ -11334,6 +11346,60 @@ safeIpcOn("get-after-sale-total-order", async (_, arg) => {
 // })
 
 const insertScriptStr = () => {
+  // Local AI acknowledgements are tied to the exact request observed at send(),
+  // not to the latest entry for a customer when a later response arrives.
+  const juhePddPendingAi = new Map();
+  const juhePddRecentAi = new Map();
+  function juhePddRememberAi(data) {
+    if (!data || typeof data.juheAiMessageKey !== "string" || !/^[a-f0-9]{64}$/.test(data.juheAiMessageKey) ||
+        !Number.isSafeInteger(data.juheAiRequestId) || typeof data.juheAiSendToken !== "string" ||
+        data.juheAiSendToken !== String(data.juheAiRequestId) + ":" + data.juheAiMessageKey ||
+        !["string", "number"].includes(typeof data.messageId) || typeof data.replyContent !== "string") return;
+    const now = Date.now();
+    for (const [id, value] of juhePddPendingAi) if (now - value.registeredAt > 300000) juhePddPendingAi.delete(id);
+    for (const [id, value] of juhePddRecentAi) if (now - value.registeredAt > 300000) juhePddRecentAi.delete(id);
+    const id = String(data.juheAiRequestId);
+    if (juhePddPendingAi.has(id) || juhePddRecentAi.has(id)) return;
+    juhePddPendingAi.set(id, Object.freeze({
+      requestId: id, token: data.juheAiSendToken, messageKey: data.juheAiMessageKey,
+      customer: String(data.messageId), content: data.replyContent, registeredAt: now,
+      reply: Object.freeze({...data, messageId:data.messageId, isAiAutoReply:true, juheAckVerified:false}),
+    }));
+  }
+  function juhePddCaptureSend(method, url, body) {
+    if (String(method).toUpperCase() !== "POST" || !["/plateau/chat/send_message", "https://mms.pinduoduo.com/plateau/chat/send_message"].includes(url)) return null;
+    let data;
+    try { data = JSON.parse(body)?.data; } catch { return null; }
+    const message = data?.message;
+    if (!data || !message || !["string", "number"].includes(typeof message.to?.uid) || typeof message.content !== "string") return null;
+    const request = Object.freeze({requestId:String(data.request_id), customer:String(message.to.uid), content:message.content, messageId:message.to.uid});
+    const expected = juhePddPendingAi.get(request.requestId);
+    const pending = expected && expected.customer === request.customer && expected.content === request.content &&
+      Date.now() - expected.registeredAt <= 300000 ? expected : null;
+    return Object.freeze({request, pending});
+  }
+  function juhePddSendSucceeded(xhr) {
+    if (!(xhr.status >= 200 && xhr.status < 300)) return false;
+    try { return (typeof xhr.response === "string" ? JSON.parse(xhr.response) : xhr.response)?.result === "ok"; }
+    catch { return false; }
+  }
+  function juhePddConfirmSend(captured, xhr) {
+    const pending = captured?.pending;
+    if (!pending || !juhePddSendSucceeded(xhr) || juhePddPendingAi.get(pending.requestId) !== pending ||
+        Date.now() - pending.registeredAt > 300000) return null;
+    juhePddPendingAi.delete(pending.requestId);
+    juhePddRecentAi.set(pending.requestId, pending);
+    return {...pending.reply, juheAiMessageKey:pending.messageKey, juheAiSendToken:pending.token,
+      juheAiRequestId:pending.requestId, juheAckVerified:true, isAiAutoReply:true};
+  }
+  function juhePddIsLocalAiEcho(packet) {
+    const id = packet?.request_id ?? packet?.data?.request_id ?? packet?.message?.request_id;
+    if (id === undefined || id === null) return false;
+    const expected = juhePddPendingAi.get(String(id)) || juhePddRecentAi.get(String(id));
+    return !!(expected && Date.now() - expected.registeredAt <= 300000 &&
+      String(packet.message?.to?.uid) === expected.customer && packet.message?.content === expected.content);
+  }
+
   let shopinfo = {};
   let globStatus = "在线";
   let delectDatalistById = new Map();
@@ -11552,6 +11618,10 @@ const insertScriptStr = () => {
     } else if (event.data.type === "CHANGE_PDD_SHOW_ROBOT_REPLY") {
       window._pddShowRobotReply = event.data.data.isPDDShowRobotReply;
     } else if (event.data.type === "SET_AI_REPLY_INFO") {
+      if (event.data.data?.juheAiMessageKey) {
+        juhePddRememberAi(event.data.data);
+        return;
+      }
       const { messageId } = event.data.data;
 
       // 🔥 获取当前计数，如果不存在则初始化
@@ -11559,6 +11629,10 @@ const insertScriptStr = () => {
         count: 0,
         ...event.data.data,
       };
+      delete currentInfo.juheAiMessageKey;
+      delete currentInfo.juheAckVerified;
+      delete currentInfo.juheAiSendToken;
+      delete currentInfo.juheAiRequestId;
       currentInfo.count++;
       window._aiReplyCountMap.set(messageId, currentInfo);
     } else if (event.data.type === "CLEAR_AI_REPLY_INFO") {
@@ -11766,7 +11840,8 @@ const insertScriptStr = () => {
               if (
                 data?.message?.to &&
                 data?.message?.content &&
-                data?.message?.manual_reply === 1
+                  data?.message?.manual_reply === 1 &&
+                  !juhePddIsLocalAiEcho(data)
               ) {
                 window.context_bridge.send("reply-customer-message", {
                   messageId: data.message.to.uid,
@@ -11892,15 +11967,21 @@ const insertScriptStr = () => {
   XMLHttpRequest.prototype.open = function (method, url) {
     this._method = method; // 保存请求方法
     this._url = url; // 保存请求 URL
+    this._juhePddActiveSend = null;
     // 调用原始的 open 方法
     originalXhrOpen.apply(this, arguments);
   };
   // 重写 send 方法
   XMLHttpRequest.prototype.send = function (body) {
+    const juhePddCapturedSend = juhePddCaptureSend(this._method, this._url, body);
+    const juhePddXhrToken = {};
+    this._juhePddActiveSend = juhePddXhrToken;
     // 在请求发送之前，添加一个事件监听器
     this.addEventListener(
       "load",
       function () {
+        if (this._juhePddActiveSend !== juhePddXhrToken) return;
+        this._juhePddActiveSend = null;
         // console.info( 'this._url=========',this._url)
         // if(this._method === 'post' &&  this._url.includes('/plateau/chat/unreply_conversations')  ){
         //   console.info('原始参数', body)
@@ -11908,25 +11989,22 @@ const insertScriptStr = () => {
         //   // data.page_num = 1
         //
         // }
-        // 手动回复消息
-        if (
-          this._method === "post" &&
-          this._url === "/plateau/chat/send_message" &&
-          this.response.includes('result":"ok"')
-        ) {
-          const {
-            data: { message },
-          } = JSON.parse(body);
-          console.info("body==================", JSON.parse(body));
-          const messageId = message.to.uid;
-          const content = message.content;
+        const juhePddAck = juhePddConfirmSend(juhePddCapturedSend, this);
+        if (juhePddAck) {
+          juhePddAck.shopMsgTotal = getMessageCont();
+          window.context_bridge.send("get-customer-callback-result", juhePddAck);
+        }
+        if (juhePddCapturedSend && juhePddSendSucceeded(this)) {
+          const messageId = juhePddCapturedSend.request.messageId;
+          const content = juhePddCapturedSend.request.content;
 
           // 🔥 检查是否是 AI 回复
-          const aiReplyInfo = window._aiReplyCountMap.get(messageId);
+          const legacy = juhePddCapturedSend.pending ? null : window._aiReplyCountMap.get(messageId);
+          const aiReplyInfo = legacy?.juheAiMessageKey ? null : legacy;
 
           const isAiReply = aiReplyInfo && aiReplyInfo.count > 0;
 
-          const baseMessage = {
+          const baseMessage = juhePddAck || {
             messageId,
             ...aiReplyInfo,
 
@@ -11935,6 +12013,10 @@ const insertScriptStr = () => {
             isReminderReply: aiReplyInfo && aiReplyInfo?.isReminderReply,
             isAiInviteReply: aiReplyInfo && aiReplyInfo?.isAiInviteReply,
           };
+          if (!juhePddAck) {
+            delete baseMessage.juheAiMessageKey; delete baseMessage.juheAckVerified;
+            delete baseMessage.juheAiSendToken; delete baseMessage.juheAiRequestId;
+          }
           if (
             isAiReply &&
             aiReplyInfo &&

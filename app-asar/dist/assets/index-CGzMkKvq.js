@@ -2015,13 +2015,13 @@ const aa = a({
             },
             {
               title: "点击AI按钮，进入AI配置",
-              content: "点击AI按钮进入AI模式，需完成4项核心配置，即可后用全部AI功能。",
+              content: "点击AI设置管理本地知识库与回复规则，模型连接后自动回复才会生效。",
               target: ".ai-switch",
               position: "right",
             },
             {
-              title: "开启AI回复，让咨询无忧",
-              content: "[数据看板】查看今日接待效果AI自动回复，7x24小时秒答商品咨询，前往",
+              title: "保存本地AI设置",
+              content: "先保存知识与回复规则，接入模型后再验证自动回复效果。",
               target: ".ai-switch",
               position: "right",
             },
@@ -2333,9 +2333,11 @@ const aa = a({
             }
           },
           M = (e) => (p.value.splice(e.index, 1), !1),
-          O = () => {
+          O = async () => {
+            const selectedOrder = E.value?.find((e) => e.orderId === d.value);
+            if (!selectedOrder) return void o.error("请先获取并选择订单，再提交工单");
             try {
-              T.value.validate().then(async () => {
+              await T.value.validate();
                 const e = p.value.filter((e) => e.file),
                   t = p.value.filter((e) => e.url).map((e) => e.url);
                 let a = [];
@@ -2367,7 +2369,7 @@ const aa = a({
                   i.length > 0 && o.error(` ${i.length} , 个文件上传失败`);
                 }
                 a = [...a, ...t];
-                const l = E.value.find((e) => e.orderId === d.value),
+                const l = selectedOrder,
                   i = {
                     presaleStatus: n.value.status,
                     workStatus: n.value.type,
@@ -2382,18 +2384,17 @@ const aa = a({
                     skucontent: l.sku,
                     shopId: Number(s.shopWork.id),
                   };
-                U(i);
-              });
+                await U(i);
             } catch (e) {
-              o.error(`文件上传过程中发生错误:${e.message}`);
+              if (!Array.isArray(e)) o.error(`工单提交失败：${e?.msg || e?.message || "请稍后重试"}`);
             }
           },
-          U = (e) => {
-            Be(e).then((e) => {
-              200 === e.status
-                ? (o.success("提交工单成功"), z("nworkorderVisible"), (p.value = []))
-                : (o.error("提交工单失败"), z("nworkorderVisible"));
-            });
+          U = async (e) => {
+            const t = await Be(e);
+            if (t.status !== 200 || (t.data?.code !== undefined && t.data.code !== 200)) {
+              throw new Error(t.data?.msg || "提交工单失败，请保留内容后重试");
+            }
+            o.success("提交工单成功"), z("nworkorderVisible"), (p.value = []);
           },
           D = () => {
             L.value.trim()
@@ -4949,42 +4950,7 @@ const Za = a({
                                                                 class: "card-actions",
                                                                 onClick: R(
                                                                   (t) =>
-                                                                    (async (e) => {
-                                                                      (dt(),
-                                                                        Ge(!1),
-                                                                        (Ae.id = e.id),
-                                                                        (Ae.title = e.title),
-                                                                        (Ae.content = e.content),
-                                                                        (Ae.groupType = "shop"),
-                                                                        (Ae.targetId =
-                                                                          e.shopId || ""),
-                                                                        (Ae.shopId = e.shopId),
-                                                                        (Ae.groupId = e.groupId),
-                                                                        (Ae.productId =
-                                                                          e.good_id || ""),
-                                                                        (Ae.titleType =
-                                                                          e.title_type),
-                                                                        (Ae.wordtitle =
-                                                                          e.wordtitle),
-                                                                        (Ae.sendType =
-                                                                          1 === e.sendType ||
-                                                                          "1" === e.sendType
-                                                                            ? 1
-                                                                            : 0),
-                                                                        (Ae.imageurls =
-                                                                          e.imageurls || ""),
-                                                                        (Ae.images = []),
-                                                                        Me.postMessage(
-                                                                          "open-auto-reply-modal",
-                                                                          JSON.stringify({
-                                                                            shop: se.shopList.find(
-                                                                              (e) =>
-                                                                                e.id === K.value,
-                                                                            ),
-                                                                            editForm: Ae,
-                                                                          }),
-                                                                        ));
-                                                                    })(e),
+                                                                    Me.send("open-local-ai-settings", { shopId: K.value, record: { title: e.title || "", content: e.content || "", scenarios: e.scenarios, sendType: e.sendType, titleType: e.title_type ?? e.titleType, imageurls: e.imageurls, goodId: e.good_id ?? e.goodId } }),
                                                                   ["stop"],
                                                                 ),
                                                               },
@@ -5744,14 +5710,14 @@ const Tl = new (class {
           },
           we = {
             id: 1,
-            shopName: "快茴科技AI",
+            shopName: "聚合客服",
             platformType: "4",
             platformLogo: U("4").platformLogo,
             loginStatus: !0,
             botStatus: 0,
             status: 0,
-            customerName: "快茴AI",
-            merchantName: "快茴AI",
+            customerName: "聚合客服",
+            merchantName: "聚合客服",
             alias: "",
             hasAiQuestion: !1,
             chatUrl: "",
@@ -6268,14 +6234,12 @@ const Tl = new (class {
                 });
                 break;
               case "aiConfig":
-                Me.postMessage("open-admin", {
-                  token: G.token,
-                  shopId: L.value,
-                  shopName: null == (t = z.value) ? void 0 : t.shopName,
-                  userId: G.userInfo.userId,
-                });
+                Me.send("open-local-ai-settings", { shopId: z.value?.id });
                 break;
               case "create-workOrder":
+                if (!z.value) return void n.warning("请先选择店铺");
+                if (!z.value.loginStatus) return void n.warning("请先登录所选店铺，再获取工单信息");
+                n.warning("工单服务尚未接入当前版本，填写的内容目前无法提交");
                 ((ft.value = !0),
                   (ht.value = z.value || {}),
                   Me.send("send-to-webcontents-view", {
@@ -6288,12 +6252,9 @@ const Tl = new (class {
                   Me.send("shop-size-change", JSON.stringify({ id: L.value, rectData: e })));
                 break;
               case "shopJj":
-                Me.postMessage("open-shopJj", {
-                  token: G.token,
-                  merchantId: z.value.merchantId || null,
-                  titleName: z.value.merchantName ?? z.value.shopName,
-                  shopId: L.value,
-                });
+                if (!z.value) return void n.warning("请先选择店铺");
+                n.warning("店铺交接服务尚未接入当前版本，请联系管理员开通服务");
+                break;
             }
           },
           Cs = (e) => {
@@ -6614,17 +6575,7 @@ const Tl = new (class {
             qt("set-global-ai-recommended-reply", (e, t) => {
               const s = Number("object" == typeof t && null !== t ? t.status : t);
               u.globalAiReplySwitch = 1 === s ? 1 : 0;
-              let a = Z.value,
-                o = 0;
-              if (1 === s) {
-                const e = Z.value.filter((e) => e.baseqa && "0" != e.baseqa);
-                ((o = Z.value.length - e.length), (a = e));
-              }
-              a.forEach((e) => {
-                ((e.aiRecommendedReply = 1 === s), (e.botStatus = s));
-              });
-              const l = a.filter((e) => e.loginStatus).map((e) => e.id.toString());
-              l.length > 0 && ss({ botStatus: s ? "1" : "0", shopids: l });
+              Z.value.forEach((shop) => { shop.aiRecommendedReply = 1 === s; });
             }),
             qt("set-scroll-to-selected-shop", (e, t) => {
               ((u.scrollToSelectedShop = t), t && Cs(L.value));
@@ -6746,6 +6697,7 @@ const Tl = new (class {
               }));
           }));
         const Ds = () => {
+          if (!z.value) return void n.warning("请先选择店铺");
           const { id: e, homeUrl: t, domainUrl: s, domain: a } = z.value;
           Me.postMessage("open-shop-home", { homeUrl: t, id: e, domainUrl: s, domain: a });
         };
@@ -7216,30 +7168,8 @@ const Tl = new (class {
             }
             Ks.value = !1;
           },
-          sa = async (e, t) => {
-            var s, a;
-            null == (a = null == (s = G.userInfo) ? void 0 : s.roles[0]) || a.roleKey;
-            const o = d.shopList.findIndex((t) => t.id === e),
-              l = d.shopList[o];
-            let n = "boolean" == typeof t ? (t ? 1 : 0) : 1 === l.botStatus ? 0 : 1;
-            if (
-              1 === n &&
-              (!(null == l ? void 0 : l.baseqa) || "0" === (null == l ? void 0 : l.baseqa))
-            )
-              return void Me.postMessage(
-                "set-shop-ai-set",
-                JSON.stringify({ shop: l, type: "baseqa" }),
-              );
-            (await os({ id: e, botId: l.botId, botStatus: n.toString() })) &&
-              (Me.postMessage("open-ai-switch", { shopId: e, status: n }),
-              (l.botStatus = n),
-              (l.autoSendAiReply = 1 === n),
-              (l.aiRecommendedReply = 1 === n),
-              Me.send("send-to-webcontents-view", {
-                shopId: e,
-                channel: "update-shop-bot-status",
-                data: { botStatus: n },
-              }));
+          sa = (shopId) => {
+            Me.send("open-local-ai-settings", { shopId });
           },
           aa = (e, t) => {
             const s = ((e) => d.shopList.find((t) => t.id === e))(e);
@@ -7979,12 +7909,11 @@ const Tl = new (class {
               await Ke(a);
               for (const t of e.ids) {
                 const s = d.shopList.find((e) => e.id === t);
-                s &&
-                  ((d.singleShopAiReplyConfig[t] = De.deepClone(e.config)),
-                  (s.baseqa = "2"),
-                  1 !== s.botStatus && (await sa(t)));
+                s && (d.singleShopAiReplyConfig[t] = De.deepClone(e.config));
               }
-            } catch (s) {}
+            } catch (s) {
+              n.error(`保存店铺AI配置失败：${s?.msg || s?.message || "请稍后重试"}`);
+            }
           }),
           qt("close-bottom-line-reply-modal", async (e, t) => {
             const { id: s, ...a } = JSON.parse(t);
@@ -9072,77 +9001,7 @@ const Tl = new (class {
                                                                                           trigger:
                                                                                             S(
                                                                                               () => [
-                                                                                                b(
-                                                                                                  w,
-                                                                                                  {
-                                                                                                    class:
-                                                                                                      A(
-                                                                                                        [
-                                                                                                          "AI-switch",
-                                                                                                          "ai-switch",
-                                                                                                          {
-                                                                                                            "AI-switch-single":
-                                                                                                              ce(
-                                                                                                                e.id,
-                                                                                                              ),
-                                                                                                          },
-                                                                                                        ],
-                                                                                                      ),
-                                                                                                    size: "small",
-                                                                                                    value:
-                                                                                                      1 ===
-                                                                                                      e.botStatus,
-                                                                                                    onClick:
-                                                                                                      t[5] ||
-                                                                                                      (t[5] =
-                                                                                                        R(() => {}, [
-                                                                                                          "stop",
-                                                                                                        ])),
-                                                                                                    "onUpdate:value":
-                                                                                                      (
-                                                                                                        t,
-                                                                                                      ) =>
-                                                                                                        sa(
-                                                                                                          e.id,
-                                                                                                          t,
-                                                                                                        ),
-                                                                                                  },
-                                                                                                  {
-                                                                                                    checked:
-                                                                                                      S(
-                                                                                                        () => [
-                                                                                                          ...(t[34] ||
-                                                                                                            (t[34] =
-                                                                                                              [
-                                                                                                                C(
-                                                                                                                  " AI ",
-                                                                                                                  -1,
-                                                                                                                ),
-                                                                                                              ])),
-                                                                                                        ],
-                                                                                                      ),
-                                                                                                    unchecked:
-                                                                                                      S(
-                                                                                                        () => [
-                                                                                                          ...(t[35] ||
-                                                                                                            (t[35] =
-                                                                                                              [
-                                                                                                                C(
-                                                                                                                  " AI ",
-                                                                                                                  -1,
-                                                                                                                ),
-                                                                                                              ])),
-                                                                                                        ],
-                                                                                                      ),
-                                                                                                    _: 1,
-                                                                                                  },
-                                                                                                  8,
-                                                                                                  [
-                                                                                                    "class",
-                                                                                                    "value",
-                                                                                                    "onUpdate:value",
-                                                                                                  ],
-                                                                                                ),
+                                                                                                b(a, { class: "AI-switch ai-switch", size: "small", title: "AI设置", onClick: R(() => sa(e.id), ["stop"]) }, { default: S(() => [C("AI设置")]), _: 2 }, 8, ["onClick"]),
                                                                                               ],
                                                                                             ),
                                                                                           default:

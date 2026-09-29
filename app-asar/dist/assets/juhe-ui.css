@@ -1,0 +1,193 @@
+/*
+ * Approved 聚禾客服平台 skin, adapted from ui-demo/refined.css.
+ * This file is loaded by every local window: never add global resets here.
+ * Vue scope IDs restrict the skin to host chrome, shop sidebar and settings.
+ * Original layout, state, IPC, platform web contents and drag transforms remain owned
+ * by the compiled application. Only the explicitly approved brand lockup is replaced.
+ */
+
+/* Shared header component. Keep the original 64px header and 318px brand region. */
+html .body[data-v-67047983] {
+  background:
+    radial-gradient(ellipse at 18% 0%, #ffffff2b 0%, #ffffff00 62%),
+    linear-gradient(112deg, #51a3f8 0%, #4a85ff 46%, #406dff 100%);
+}
+html .header-container[data-v-67047983] {
+  border-bottom-color: #406dff;
+  box-shadow: inset 0 1px 0 #ffffff33, inset 0 -1px 0 #ffffff14;
+  -webkit-font-smoothing: antialiased;
+}
+html .user-info-section[data-v-67047983] { min-width: 0; }
+html .user-info-section[data-v-67047983] > .flex { min-width: 0; max-width: 100%; }
+html .user-info-section[data-v-67047983] .juhe-brand-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+html .user-info-section[data-v-67047983] .juhe-brand-logo {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  object-fit: contain;
+}
+html .user-info-section[data-v-67047983] .juhe-brand-wordmark {
+  color: #fff;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: .8px;
+  white-space: nowrap;
+  text-shadow: 0 2px 8px #406dff33;
+}
+/* Hide presentation only; retain the original version/AI state and computations. */
+html .user-info-section[data-v-67047983] :is(.juhe-brand-version, .juhe-brand-power) { display: none; }
+
+/* Background paint animates inside the original hit areas, never translate/scale. */
+html .header-container[data-v-67047983] :is(
+  .menu-item[data-v-40037f27],
+  .shop-handover-btn[data-v-67047983],
+  .notification-icon-placeholder[data-v-67047983],
+  .notification-icon-btn[data-v-fc729d9f],
+  .indicator-container[data-v-63f75940],
+  .eye-icon-container[data-v-67047983],
+  .user-info-display[data-v-67047983],
+  .menu-scroll-arrow[data-v-67047983],
+  .titlebar-button[data-v-67047983]
+) {
+  background-image:
+    linear-gradient(110deg, #ffffff00 38%, #ffffff33 50%, #ffffff00 62%),
+    linear-gradient(180deg, #ffffff0a, #ffffff00);
+  background-size: 260% 100%, 100% 100%;
+  background-position: 120% 0, 0 0;
+  background-repeat: no-repeat;
+  transition:
+    background-position 650ms cubic-bezier(.22, .68, .2, 1),
+    background-color 180ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    opacity 200ms ease;
+}
+html .header-container[data-v-67047983] :is(
+  .menu-item[data-v-40037f27],
+  .shop-handover-btn[data-v-67047983],
+  .notification-icon-placeholder[data-v-67047983],
+  .notification-icon-btn[data-v-fc729d9f],
+  .indicator-container[data-v-63f75940],
+  .eye-icon-container[data-v-67047983],
+  .user-info-display[data-v-67047983],
+  .menu-scroll-arrow[data-v-67047983],
+  .titlebar-button[data-v-67047983]
+):is(:hover, :focus-visible) {
+  background-position: -40% 0, 0 0;
+  background-color: #ffffff26;
+  box-shadow: inset 0 1px 0 #ffffff59, inset 0 0 0 1px #ffffff26, 0 3px 10px #406dff33;
+}
+html .header-container[data-v-67047983] :is(
+  .menu-item[data-v-40037f27],
+  .shop-handover-btn[data-v-67047983],
+  .notification-icon-placeholder[data-v-67047983],
+  .notification-icon-btn[data-v-fc729d9f],
+  .indicator-container[data-v-63f75940],
+  .eye-icon-container[data-v-67047983],
+  .user-info-display[data-v-67047983],
+  .menu-scroll-arrow[data-v-67047983],
+  .titlebar-button[data-v-67047983]
+):active {
+  background-color: #ffffff14;
+  box-shadow: inset 0 2px 5px #406dff33, inset 0 0 0 1px #ffffff26;
+}
+html .header-container[data-v-67047983] .menu-item[data-v-40037f27] { border-radius: 8px; }
+html .header-container[data-v-67047983] .shop-handover-btn[data-v-67047983] { border-radius: 6px; }
+html .header-container[data-v-67047983] .user-info-display[data-v-67047983] { border-radius: 8px; }
+html .header-container[data-v-67047983] #juhe-user-status-entry { cursor: pointer; -webkit-app-region: no-drag; }
+html .header-container[data-v-67047983] #juhe-user-status-entry:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+html .header-container[data-v-67047983] .juhe-user-status-label { color: #fff; font-size: 12px; font-weight: 500; white-space: nowrap; }
+html .header-container[data-v-67047983] .user-info-display[data-v-67047983] img {
+  transition: box-shadow 220ms ease, border-color 220ms ease;
+}
+html .header-container[data-v-67047983] .user-info-display[data-v-67047983]:is(:hover, :focus-within) img {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px #ffffff26;
+}
+html .header-container[data-v-67047983] .titlebar-controls[data-v-67047983] .close-btn[data-v-67047983]:is(:hover, :focus-visible) { background-color: #e81123; }
+html .header-container[data-v-67047983] .titlebar-controls[data-v-67047983] .close-btn[data-v-67047983]:active { background-color: #c50f1f; }
+
+/* Main host sidebar only. The active store cards are .store-item, not .shop-card. */
+html .sidebar-modern[data-v-fc729d9f] { border-radius: 0 0 0 12px; box-shadow: none; -webkit-font-smoothing: antialiased; }
+html .sidebar-modern[data-v-fc729d9f] .search-input[data-v-fc729d9f] { border-radius: 8px; }
+html .sidebar-modern[data-v-fc729d9f] .search-input[data-v-fc729d9f] :is(.n-input__border, .n-input__state-border) { border-radius: 8px; }
+html .sidebar-modern[data-v-fc729d9f] .search-input[data-v-fc729d9f]:focus-within { box-shadow: 0 0 0 3px #4171fe14; }
+html .sidebar-modern[data-v-fc729d9f] .addClass[data-v-fc729d9f] {
+  box-shadow: 0 1px 2px #4171ee22;
+  transition: box-shadow 150ms ease;
+}
+html .sidebar-modern[data-v-fc729d9f] .addClass[data-v-fc729d9f]:hover { box-shadow: 0 0 0 3px #4171ee22; }
+html .sidebar-modern[data-v-fc729d9f] .stat-content[data-v-fc729d9f] {
+  border-radius: 8px;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+html .sidebar-modern[data-v-fc729d9f] .stat-content[data-v-fc729d9f]:hover {
+  transform: none;
+  box-shadow: 0 1px 4px #0000000f;
+}
+html:not(.dark) .sidebar-modern[data-v-fc729d9f] .stat-content[data-v-fc729d9f] { border-color: #e2e8f0; }
+html:not(.dark) .sidebar-modern[data-v-fc729d9f] .stat-content-avter[data-v-fc729d9f] {
+  border-color: #cfdbff;
+  box-shadow: 0 1px 3px #4171fe1a;
+}
+html .sidebar-modern[data-v-fc729d9f] .store-item[data-v-fc729d9f] {
+  border-radius: 10px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+/* Do not override a card's inline transform or drag-state classes. */
+html:not(.dark) .sidebar-modern[data-v-fc729d9f] .store-item[data-v-fc729d9f] { border-color: #e2e8f0; }
+html:not(.dark) .sidebar-modern[data-v-fc729d9f] .store-item[data-v-fc729d9f]:hover {
+  border-color: #cfdbff;
+  box-shadow: 0 2px 6px #00000008;
+}
+html:not(.dark) .sidebar-modern[data-v-fc729d9f] .store-item.selected[data-v-fc729d9f] {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 6px #3b82f614;
+}
+html .sidebar-modern[data-v-fc729d9f] .shop-tag[data-v-fc729d9f] { border-radius: 4px; }
+html .sidebar-modern[data-v-fc729d9f] .platform-logo[data-v-fc729d9f] { box-shadow: 0 1px 3px #0000000f; }
+
+/* Real GeneralSet/AI setting panels; never introduce demo forms or settings values. */
+html .app-container[data-v-2b7512c6] { -webkit-font-smoothing: antialiased; }
+html .app-container[data-v-2b7512c6] :is(.account-section, .panel) { border-radius: 12px; }
+html .app-container[data-v-2b7512c6] :is(.n-button, .btn, .n-input, .n-base-selection) { border-radius: 7px; }
+html .app-container[data-v-2b7512c6] :is(.n-input__border, .n-input__state-border, .n-base-selection__border, .n-base-selection__state-border) { border-radius: 7px; }
+html .app-container[data-v-2b7512c6] .btn-primary { box-shadow: 0 1px 3px #4171fe26; }
+html .app-container[data-v-2b7512c6] .btn-secondary:hover { border-color: #cfdbff; }
+html .app-container[data-v-2b7512c6] :is(.ai-setting-item[data-v-d5b16c88], .ai-setting-item[data-v-2bfc90b8]) { border-radius: 10px; }
+
+.juhe-company-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 12px 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+  user-select: text;
+  -webkit-app-region: no-drag;
+}
+html.dark .juhe-company-info { color: #a8b5c7; }
+
+/* Respect OS motion preference without changing any other popup or webview. */
+@media (prefers-reduced-motion: reduce) {
+  html .header-container[data-v-67047983] *,
+  html .header-container[data-v-67047983] *::before,
+  html .header-container[data-v-67047983] *::after,
+  html .sidebar-modern[data-v-fc729d9f] *,
+  html .app-container[data-v-2b7512c6] *,
+  html .app-container[data-v-2b7512c6] *::before,
+  html .app-container[data-v-2b7512c6] *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  html .header-container[data-v-67047983] .scrollable-menu-container[data-v-40037f27] { scroll-behavior: auto; }
+}

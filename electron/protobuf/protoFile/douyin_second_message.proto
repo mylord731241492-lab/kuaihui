@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package dy;
+
+// 根消息类型
+message Root {
+    int64 field1 = 1;
+    int64 field2 = 2;
+    int64 field3 = 3;
+    int64 field4 = 4;
+    string field5 = 5;
+    string field6 = 6;
+    string field7 = 7;
+    SubMessage field8 = 8;
+}
+
+// 更深层的嵌套消息类型
+message SubMessage {
+    int64 field1 = 1;
+    int64 field2 = 2;
+    int64 field3 = 3;
+    int64 field4 = 4;
+    int64 field5 = 5;
+    Item field6 = 6;
+}
+
+// 包含多个字段的复杂项
+message Item {
+    Message field500 = 500;
+}
+
+// 另一个包含多个字段的消息
+message Message {
+    SubSubSubMessage SubSubMessage = 5;
+}
+
+message SubSubSubMessage {
+    int64 field5 = 5;
+    int64 field6 = 6;
+    int64 field7 = 7;
+    string field8 = 8;
+    repeated ExtraField field9 = 9;
+    int64 field10 = 10;
+}
+
+// 包含两个字段的额外字段
+message ExtraField {
+    string key = 1;
+    string value = 2;
+}

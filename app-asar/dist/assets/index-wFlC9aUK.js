@@ -681,7 +681,7 @@ const Ce = A("n-float-button-group"),
                 );
                 break;
               case "admin":
-                window.open("http://xiaoniu.niushidai.cn/");
+                X.send("open-local-ai-settings", {});
             }
           },
           V = a(null),

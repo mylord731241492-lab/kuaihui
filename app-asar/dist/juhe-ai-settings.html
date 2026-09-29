@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>AI 配置 · 聚禾客服平台</title>
+  <link rel="stylesheet" href="./juhe-ai-settings.css">
+  <script src="./juhe-ai-settings.js" defer></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="identity"><span class="app-mark" aria-hidden="true">AI</span><div><h1>AI 配置</h1><p>聚禾客服平台</p></div></div>
+    <div class="header-actions"><span class="local-badge"><span aria-hidden="true"></span>本机工作空间</span><button id="close-window" class="icon-button" type="button" aria-label="关闭 AI 配置窗口" data-lock>×</button></div>
+  </header>
+  <div class="app-layout">
+    <nav class="sidebar" aria-label="AI 配置导航">
+      <div class="nav-caption">配置中心</div>
+      <button id="tab-knowledge" class="nav-button active" type="button" aria-selected="true" aria-controls="knowledge-panel" role="tab" data-lock><span aria-hidden="true">▤</span>知识库</button>
+      <button id="tab-products" class="nav-button" type="button" aria-selected="false" aria-controls="products-panel" role="tab" data-lock><span aria-hidden="true">◇</span>商品学习</button>
+      <button id="tab-replies" class="nav-button" type="button" aria-selected="false" aria-controls="replies-panel" role="tab" data-lock><span aria-hidden="true">☷</span>回复设置</button>
+      <button id="tab-runtime" class="nav-button" type="button" aria-selected="false" aria-controls="runtime-panel" role="tab" data-lock><span aria-hidden="true">⌁</span>模型连接</button>
+      <button id="tab-preview" class="nav-button" type="button" aria-selected="false" aria-controls="preview-panel" role="tab" data-lock><span aria-hidden="true">▷</span>试答</button>
+      <div class="sidebar-note"><strong>资料留在当前账号</strong><p>知识与规则保存在本机。试答和商品学习会向配置的模型发送所需资料。</p><span id="sidebar-runtime-status">正在读取模型连接</span></div>
+    </nav>
+    <main id="workspace">
+      <div id="notification" class="notification" role="status" aria-live="polite" hidden></div>
+      <div id="initial-error" class="initial-error" hidden><h2>暂时无法读取配置</h2><p id="initial-error-text"></p><button id="retry-load" class="button primary" type="button">重新加载</button></div>
+      <section id="knowledge-panel" class="panel" role="tabpanel" aria-labelledby="tab-knowledge">
+        <div class="section-heading"><div><h2>知识库</h2><p>整理常见问题与标准答案，让店铺回复有据可依。</p></div><span id="record-count" class="count-badge">0 条知识</span></div>
+        <div class="scope-row"><label for="knowledge-scope">知识范围</label><select id="knowledge-scope" data-lock><option value="__shared__">公共知识库</option></select><span id="knowledge-scope-note" class="field-note">当前账号的公共知识，可复制到指定店铺。</span></div>
+        <div class="knowledge-toolbar">
+          <label class="search-box"><span aria-hidden="true">⌕</span><input id="knowledge-search" type="search" placeholder="搜索问题、答案或场景" aria-label="搜索知识" data-lock></label>
+          <button id="record-new" class="button primary" type="button" data-lock>＋ 新增知识</button>
+          <button id="knowledge-import" class="button" type="button" data-lock>导入</button>
+          <button id="knowledge-export" class="button" type="button" data-lock>导出</button>
+          <button id="knowledge-template" class="button quiet" type="button" data-lock>模板</button>
+          <button id="knowledge-copy" class="button quiet" type="button" data-lock>复制到店铺</button>
+          <input id="import-file" type="file" accept=".json,.csv,application/json,text/csv" hidden>
+        </div>
+        <div class="knowledge-workspace">
+          <aside class="knowledge-list-pane" aria-label="知识列表"><div class="list-header"><span>问题列表</span><span id="list-count"></span></div><div id="knowledge-list" class="knowledge-list"></div><div id="knowledge-empty" class="empty-state"><div aria-hidden="true">▤</div><strong>还没有知识</strong><p>在右侧写下第一个问题和答案，<br>也可以从 JSON 或 CSV 文件导入。</p></div></aside>
+          <form id="record-form" class="record-editor">
+            <div class="editor-heading"><div><h3 id="editor-title">新增知识</h3><p id="editor-scope">公共知识库</p></div><span id="record-dirty" class="draft-badge" hidden>未保存</span></div>
+            <fieldset id="record-fields" data-lock>
+              <p id="legacy-draft-note" class="notification" hidden>旧版资料草稿，保存后成为本地新条目。</p>
+              <label class="field" for="record-title"><span>问题 <b class="required">*</b></span><input id="record-title" required maxlength="200" placeholder="例如：下单后多久发货？" autocomplete="off"></label>
+              <label class="field" for="record-content"><span>标准答案</span><textarea id="record-content" rows="5" maxlength="20000" placeholder="填写准确、完整的回答，支持换行。"></textarea><small>标准答案与图片地址至少填写一项。</small></label>
+              <div class="field-grid"><label class="field" for="record-scenarios"><span>回复场景</span><input id="record-scenarios" placeholder="例如：售前咨询、物流查询"><small>多个场景用逗号分隔；留空适用所有场景。</small></label><label class="field" for="record-send-type"><span>发送方式</span><select id="record-send-type"><option value="0">AI 润色发送</option><option value="1">原话发送</option></select></label></div>
+              <details class="record-details"><summary>更多关联信息</summary><p class="field-note">关联商品 ID 用于限定知识适用的商品。图片地址保留为资料。</p><div class="field-grid"><label class="field" for="record-good-id"><span>关联商品 ID</span><input id="record-good-id" placeholder="选填"></label><label class="field" for="record-title-type"><span>分类标识</span><input id="record-title-type" placeholder="选填"></label></div><label class="field" for="record-image-urls"><span>图片地址</span><textarea id="record-image-urls" rows="2" placeholder="选填，每行一个完整地址"></textarea></label></details>
+            </fieldset>
+            <div class="editor-actions"><button id="record-delete" class="button danger quiet" type="button" disabled data-lock>删除此条</button><div><button id="record-reset" class="button" type="button" data-lock>撤销修改</button><button id="record-save" class="button primary" type="submit" data-lock>保存知识</button></div></div>
+          </form>
+        </div>
+      </section>
+      <section id="replies-panel" class="panel" role="tabpanel" aria-labelledby="tab-replies" hidden>
+        <div class="section-heading"><div><h2>回复设置</h2><p>设置接待方式、回复标识与转人工规则。</p></div></div>
+        <div class="scope-row"><label for="config-scope">设置范围</label><select id="config-scope" data-lock><option value="__global__">全局回复设置</option></select><span class="field-note">单店设置可继承全局，也可单独配置。</span></div>
+        <form id="config-form" class="config-card">
+          <div id="inherit-row" class="inherit-row" hidden><div><strong>使用全局回复设置</strong><p id="inherit-description">关闭后，可为这家店铺单独设置。</p></div><label class="switch"><input id="config-inherit" type="checkbox" checked data-lock><span aria-hidden="true"></span><span class="sr-only">使用全局回复设置</span></label></div>
+          <fieldset id="config-fields">
+            <div class="config-group"><h3>接待方式</h3><div class="field-grid"><label class="field" for="config-strategy"><span>AI 回复模式</span><select id="config-strategy"><option value="AI_RGA">AI 全自动接待</option><option value="AI_RGA_FILTER">AI 人机协同</option></select><small>人机协同模式有本地知识、商品或订单依据时回复；缺少依据转人工。</small></label><label class="field" for="config-work-mode"><span>AI 工作流</span><select id="config-work-mode"><option value="0">默认 AI 工作流模型</option><option value="1">Beta 版 AI 工作流模型</option></select><small>本地接入统一使用当前模型和知识检索；此选项保留旧版偏好。</small></label></div><label class="field narrow-field" for="config-reply-flag"><span>AI 回复标识符</span><input id="config-reply-flag" maxlength="40" placeholder="例如：."><small>添加在回复内容前，可留空。</small></label></div>
+            <div class="config-group"><h3>转人工规则</h3><label class="field" for="config-sensitive-words"><span>关键词转人工</span><textarea id="config-sensitive-words" rows="3" placeholder="例如：退款、投诉、人工客服"></textarea><small>多个关键词用逗号或换行分隔。</small></label><div class="field-grid"><label class="field" for="config-human-type"><span>转人工方式</span><select id="config-human-type"><option value="0">弹窗提示（推荐）</option><option value="1">直接转接到指定子账号</option><option value="2">仅做星标标记</option></select><small id="human-type-note" hidden>视频号与淘工厂暂不支持星标标记。</small></label><label id="sub-account-field" class="field" for="config-sub-account" hidden><span>子账号昵称 <b class="required">*</b></span><input id="config-sub-account" maxlength="200" placeholder="输入接待的子账号昵称"></label></div></div>
+          </fieldset>
+          <div class="config-footer"><span id="config-dirty" class="draft-badge" hidden>有未保存的修改</span><div><button id="config-reset" class="button" type="button" data-lock>撤销修改</button><button id="config-save" class="button primary" type="submit" data-lock>保存回复设置</button></div></div>
+        </form>
+      </section>
+      <section id="runtime-panel" class="panel" role="tabpanel" aria-labelledby="tab-runtime" hidden>
+        <div class="section-heading"><div><h2>模型连接</h2><p>连接你自己的模型中转站，先测试连接，再到试答中检查回复。</p></div><div class="section-actions"><span id="runtime-ready" class="count-badge">尚未配置</span><button id="runtime-reload" class="button" type="button" data-lock>重新读取</button></div></div>
+        <div id="runtime-load-error" class="notification error" hidden></div>
+        <form id="runtime-form" class="config-card">
+          <fieldset id="runtime-fields"><div class="config-group"><h3>接口配置</h3>
+            <label class="field" for="runtime-base-url"><span>API 地址 <b class="required">*</b></span><input id="runtime-base-url" type="url" required maxlength="2000" placeholder="https://你的中转站/v1" autocomplete="off"><small>填写中转站的 API 基础地址，通常以 /v1 结尾。</small></label>
+            <div class="field-grid"><label class="field" for="runtime-model"><span>模型名称 <b class="required">*</b></span><input id="runtime-model" required maxlength="200" placeholder="填写中转站提供的模型名称" autocomplete="off"></label><label class="field" for="runtime-format"><span>接口格式</span><select id="runtime-format"><option value="chat-completions">Chat Completions</option><option value="responses">Responses</option></select></label></div>
+            <label class="field" for="runtime-api-key"><span>API Key</span><input id="runtime-api-key" type="password" maxlength="4096" placeholder="输入新密钥" autocomplete="new-password" spellcheck="false"><small id="runtime-key-status">尚未保存密钥。</small></label>
+          </div><div class="config-group"><h3>运行开关</h3>
+            <label class="option-line"><input id="runtime-enabled" type="checkbox"><span><strong>允许 AI 自动回复客户</strong><small>开启并保存后，仅对下方明确选中的店铺启用。可以保持关闭，仅进行试答。</small></span></label>
+            <div class="runtime-shops"><span class="field-note">启用 AI 自动回复的店铺</span><div id="runtime-shops"></div><p id="runtime-no-shops" class="field-note" hidden>当前没有店铺，可先保存连接并试答公共知识。</p></div>
+            <label class="option-line"><input id="runtime-auto-learn" type="checkbox"><span><strong>自动学习已采集的商品资料</strong><small>采集到足够的商品文字资料时，调用模型整理商品知识；资料不足时保留待补充状态。</small></span></label>
+          </div></fieldset>
+          <div id="runtime-probe" class="probe-result" role="status" hidden></div>
+          <div class="config-footer"><span id="runtime-dirty" class="draft-badge" hidden>有未保存的修改</span><div><button id="runtime-test" class="button" type="button" data-lock>测试已保存的连接</button><button id="runtime-save" class="button primary" type="submit" data-lock>保存模型连接</button></div></div>
+        </form>
+      </section>
+      <section id="products-panel" class="panel" role="tabpanel" aria-labelledby="tab-products" hidden>
+        <div class="section-heading"><div><h2>商品学习</h2><p>查看已采集资料，也可手动补充商品信息，再让模型整理成可检索的知识。</p></div><span id="product-count" class="count-badge">0 件商品</span></div>
+        <div class="scope-row"><label for="product-scope">所属店铺</label><select id="product-scope" data-lock></select><button id="products-collect" class="button" type="button" data-lock>从已登录店铺采集</button><button id="products-refresh" class="button" type="button" data-lock>刷新资料</button><button id="product-new" class="button primary" type="button" data-lock>＋ 手动补充</button></div>
+        <p class="field-note collection-note">采集前请先登录对应店铺。平台采集需要一定时间，可点击“刷新资料”查看已收到的商品。</p>
+        <div class="knowledge-workspace product-workspace">
+          <aside class="knowledge-list-pane" aria-label="商品资料列表"><div class="list-header"><span>商品资料</span><span>仅成功整理后标记已学习</span></div><div id="product-list" class="knowledge-list"></div><div id="product-empty" class="empty-state"><div aria-hidden="true">◇</div><strong>暂无商品资料</strong><p>采集到的商品资料会显示在这里，<br>也可手动补充文字资料。</p></div></aside>
+          <form id="product-form" class="record-editor">
+            <div class="editor-heading"><div><h3 id="product-editor-title">手动补充资料</h3><p id="product-meta">手动资料与平台采集资料分别标明来源。</p></div><span id="product-dirty" class="draft-badge" hidden>未保存</span></div>
+            <fieldset id="product-fields"><label class="field" for="product-id"><span>商品 ID <b class="required">*</b></span><input id="product-id" required maxlength="200" placeholder="与平台中的商品 ID 保持一致"></label><label class="field" for="product-title"><span>商品名称 <b class="required">*</b></span><input id="product-title" required maxlength="500" placeholder="商品标题"></label><label class="field" for="product-content"><span>商品文字资料 <b class="required">*</b></span><textarea id="product-content" required rows="5" maxlength="50000" placeholder="填写规格、材质、使用方法、注意事项等实际资料。"></textarea></label><label class="field" for="product-images"><span>图片地址</span><textarea id="product-images" rows="2" placeholder="选填，每行一个完整地址"></textarea><small>图片地址随资料保存，学习以可读取的文字资料为依据。</small></label><div id="product-learned" class="learned-content" hidden><h3>整理后的商品知识</h3><p id="product-learned-text"></p></div></fieldset>
+            <div class="editor-actions"><button id="product-learn" class="button" type="button" data-lock>学习已保存资料</button><div><button id="product-reset" class="button" type="button" data-lock>撤销修改</button><button id="product-save" class="button primary" type="submit" data-lock>保存资料</button></div></div>
+          </form>
+        </div>
+      </section>
+      <section id="preview-panel" class="panel" role="tabpanel" aria-labelledby="tab-preview" hidden>
+        <div class="section-heading"><div><h2>试答</h2><p>用已保存的知识、商品资料和回复设置测试 AI，不会发送给客户。</p></div><span class="count-badge">仅测试</span></div>
+        <div class="preview-workspace"><form id="preview-form" class="preview-form config-card"><fieldset id="preview-fields" data-lock><div class="config-group"><label class="field" for="preview-scope"><span>测试店铺</span><select id="preview-scope"></select></label><label class="field" for="preview-product-id"><span>商品 ID</span><input id="preview-product-id" maxlength="200" placeholder="选填，用于检索该商品的资料"></label><label class="field" for="preview-question"><span>客户问题 <b class="required">*</b></span><textarea id="preview-question" rows="7" maxlength="10000" required placeholder="例如：这款商品可以水洗吗？"></textarea></label></div></fieldset><div class="config-footer"><div><button id="preview-submit" class="button primary" type="submit" data-lock>生成试答</button></div></div></form>
+        <div id="preview-result" class="preview-result" aria-live="polite"><div id="preview-empty" class="empty-state"><div aria-hidden="true">▷</div><strong>查看 AI 如何回答</strong><p>输入问题后生成试答，<br>同时查看引用的知识与转人工原因。</p></div><div id="preview-output" hidden><div class="editor-heading"><h3>本次试答</h3><span id="preview-outcome" class="count-badge"></span></div><p id="preview-reason" class="preview-reason"></p><div id="preview-answer" class="answer-content"></div><div class="source-section"><h3 id="preview-source-heading">参考资料</h3><ul id="preview-sources"></ul><p id="preview-request-id" class="field-note"></p></div></div><section class="history-section"><div class="editor-heading"><h3>最近记录与待补充问题</h3><button id="history-refresh" class="button quiet" type="button" data-lock>刷新</button></div><p id="history-message" class="field-note">选择范围后可查看最近记录。</p><div id="runtime-history"></div></section></div></div>
+      </section>
+      <footer class="workspace-footer"><span id="save-state" role="status">正在读取本机配置…</span><span id="footer-runtime-status">正在读取模型连接</span></footer>
+    </main>
+  </div>
+  <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">放弃未保存的修改？</h2><p id="confirm-message"></p><div class="dialog-actions"><button id="confirm-cancel" class="button" value="cancel">继续编辑</button><button id="confirm-accept" class="button primary" value="accept">放弃修改</button></div></form></dialog>
+  <dialog id="transfer-dialog"><form id="transfer-form"><h2 id="transfer-title">导出知识</h2><p id="transfer-description"></p><div id="format-options" class="format-options"><label><input type="radio" name="file-format" value="json" checked> JSON <small>保留全部字段，适合备份</small></label><label><input type="radio" name="file-format" value="csv"> CSV <small>可用表格工具编辑</small></label></div><div id="copy-targets" class="copy-targets" hidden></div><div class="dialog-actions"><button id="transfer-cancel" class="button" type="button">取消</button><button id="transfer-submit" class="button primary" type="submit">导出</button></div></form></dialog>
+</body>
+</html>

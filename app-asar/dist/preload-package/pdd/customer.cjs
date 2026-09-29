@@ -1590,6 +1590,15 @@ const preloadOrderAndGoodsByNeedOrder = async (a) => {
     console["log"]("[needOrder]\x20pdd主动拉取订单商品失败:", b);
   }
 };
+// Use a monotonic safe integer in a different range from the page's Date.now()
+// request IDs. Several AI replies in one millisecond must remain distinguishable.
+let juhePddLastRequestId = 0;
+function juheNextPddRequestId() {
+  const next = Math.max(Date.now() * 1000, juhePddLastRequestId + 1);
+  if (!Number.isSafeInteger(next)) throw Error("无法生成有效的消息请求编号");
+  juhePddLastRequestId = next;
+  return next;
+}
 safeIpcOn("reply-message", (a, b) => {
   let c = [];
   try {
@@ -1604,7 +1613,7 @@ safeIpcOn("reply-message", (a, b) => {
   if (c["length"] > 0x0) {
     if (sendInsert && c[0x0]["messageId"]) {
       const f = c[0x0],
-        g = Date["now"](),
+        g = juheNextPddRequestId(),
         h = {
           ...f,
           messageId: f["messageId"] || f["userId"],
@@ -1613,6 +1622,11 @@ safeIpcOn("reply-message", (a, b) => {
           isBottomLineAutoReply: f["isBottomLineAutoReply"] || ![],
           isReminderReply: f?.["isReminderReply"] || ![],
           isAiInviteReply: f?.["isAiInviteReply"] || ![],
+          ...(f.juheAiMessageKey ? {
+            juheAiRequestId: g,
+            juheAiSendToken: String(g) + ":" + f.juheAiMessageKey,
+            juheAckVerified: false,
+          } : {}),
         };
       ((c[0x0]?.["imageBase64"] || c[0x0]?.["imageUrl"]) &&
         (c[0x0]?.["imageBase64"]
@@ -1646,7 +1660,7 @@ safeIpcOn("reply-message", (a, b) => {
                     uid: c[0x0]["messageId"],
                   },
                   from: { role: "mall_cs" },
-                  ts: g,
+                  ts: Date.now(),
                   content: c[0x0]["replyContent"],
                   msg_id: null,
                   type: 0x0,
@@ -10494,6 +10508,59 @@ const getUserHistoryData = () => {
     }
   }));
 const insertScriptStr = () => {
+  // Local AI acknowledgements are tied to the exact request observed at send(),
+  // not to the latest entry for a customer when a later response arrives.
+  const juhePddPendingAi = new Map();
+  const juhePddRecentAi = new Map();
+  function juhePddRememberAi(data) {
+    if (!data || typeof data.juheAiMessageKey !== "string" || !/^[a-f0-9]{64}$/.test(data.juheAiMessageKey) ||
+        !Number.isSafeInteger(data.juheAiRequestId) || typeof data.juheAiSendToken !== "string" ||
+        data.juheAiSendToken !== String(data.juheAiRequestId) + ":" + data.juheAiMessageKey ||
+        !["string", "number"].includes(typeof data.messageId) || typeof data.replyContent !== "string") return;
+    const now = Date.now();
+    for (const [id, value] of juhePddPendingAi) if (now - value.registeredAt > 300000) juhePddPendingAi.delete(id);
+    for (const [id, value] of juhePddRecentAi) if (now - value.registeredAt > 300000) juhePddRecentAi.delete(id);
+    const id = String(data.juheAiRequestId);
+    if (juhePddPendingAi.has(id) || juhePddRecentAi.has(id)) return;
+    juhePddPendingAi.set(id, Object.freeze({
+      requestId: id, token: data.juheAiSendToken, messageKey: data.juheAiMessageKey,
+      customer: String(data.messageId), content: data.replyContent, registeredAt: now,
+      reply: Object.freeze({...data, messageId:data.messageId, isAiAutoReply:true, juheAckVerified:false}),
+    }));
+  }
+  function juhePddCaptureSend(method, url, body) {
+    if (String(method).toUpperCase() !== "POST" || !["/plateau/chat/send_message", "https://mms.pinduoduo.com/plateau/chat/send_message"].includes(url)) return null;
+    let data;
+    try { data = JSON.parse(body)?.data; } catch { return null; }
+    const message = data?.message;
+    if (!data || !message || !["string", "number"].includes(typeof message.to?.uid) || typeof message.content !== "string") return null;
+    const request = Object.freeze({requestId:String(data.request_id), customer:String(message.to.uid), content:message.content, messageId:message.to.uid});
+    const expected = juhePddPendingAi.get(request.requestId);
+    const pending = expected && expected.customer === request.customer && expected.content === request.content &&
+      Date.now() - expected.registeredAt <= 300000 ? expected : null;
+    return Object.freeze({request, pending});
+  }
+  function juhePddSendSucceeded(xhr) {
+    if (!(xhr.status >= 200 && xhr.status < 300)) return false;
+    try { return (typeof xhr.response === "string" ? JSON.parse(xhr.response) : xhr.response)?.result === "ok"; }
+    catch { return false; }
+  }
+  function juhePddConfirmSend(captured, xhr) {
+    const pending = captured?.pending;
+    if (!pending || !juhePddSendSucceeded(xhr) || juhePddPendingAi.get(pending.requestId) !== pending ||
+        Date.now() - pending.registeredAt > 300000) return null;
+    juhePddPendingAi.delete(pending.requestId);
+    juhePddRecentAi.set(pending.requestId, pending);
+    return {...pending.reply, juheAiMessageKey:pending.messageKey, juheAiSendToken:pending.token,
+      juheAiRequestId:pending.requestId, juheAckVerified:true, isAiAutoReply:true};
+  }
+  function juhePddIsLocalAiEcho(packet) {
+    const id = packet?.request_id ?? packet?.data?.request_id ?? packet?.message?.request_id;
+    if (id === undefined || id === null) return false;
+    const expected = juhePddPendingAi.get(String(id)) || juhePddRecentAi.get(String(id));
+    return !!(expected && Date.now() - expected.registeredAt <= 300000 &&
+      String(packet.message?.to?.uid) === expected.customer && packet.message?.content === expected.content);
+  }
   let a = {},
     b = "在线",
     c = new Map();
@@ -10670,11 +10737,19 @@ const insertScriptStr = () => {
                 window["_pddShowRobotReply"] = F["data"]["data"]["isPDDShowRobotReply"];
               else {
                 if (F["data"]["type"] === "SET_AI_REPLY_INFO") {
+                  if (F["data"]["data"]?.juheAiMessageKey) {
+                    juhePddRememberAi(F["data"]["data"]);
+                    return;
+                  }
                   const { messageId: G } = F["data"]["data"],
                     H = window["_aiReplyCountMap"]["get"](G) || {
                       count: 0x0,
                       ...F["data"]["data"],
                     };
+                  delete H.juheAiMessageKey;
+                  delete H.juheAckVerified;
+                  delete H.juheAiSendToken;
+                  delete H.juheAiRequestId;
                   (H["count"]++, window["_aiReplyCountMap"]["set"](G, H));
                 } else {
                   if (F["data"]["type"] === "CLEAR_AI_REPLY_INFO") {
@@ -10813,7 +10888,8 @@ const insertScriptStr = () => {
                     const P = JSON["parse"](O["data"]);
                     P?.["message"]?.["to"] &&
                       P?.["message"]?.["content"] &&
-                      P?.["message"]?.["manual_reply"] === 0x1 &&
+                    P?.["message"]?.["manual_reply"] === 0x1 &&
+                      !juhePddIsLocalAiEcho(P) &&
                       window["context_bridge"]["send"]("reply-customer-message", {
                         messageId: P["message"]["to"]["uid"],
                         content: P["message"]["content"],
@@ -10896,26 +10972,29 @@ const insertScriptStr = () => {
   const D = XMLHttpRequest["prototype"]["open"],
     E = XMLHttpRequest["prototype"]["send"];
   ((XMLHttpRequest["prototype"]["open"] = function (F, G) {
-    ((this["_method"] = F), (this["_url"] = G), D["apply"](this, arguments));
+    ((this["_method"] = F), (this["_url"] = G), (this["_juhePddActiveSend"] = null), D["apply"](this, arguments));
   }),
     (XMLHttpRequest["prototype"]["send"] = function (F) {
+      const juhePddCapturedSend = juhePddCaptureSend(this["_method"], this["_url"], F);
+      const juhePddXhrToken = {};
+      this["_juhePddActiveSend"] = juhePddXhrToken;
       (this["addEventListener"](
         "load",
         function () {
-          if (
-            this["_method"] === "post" &&
-            this["_url"] === "/plateau/chat/send_message" &&
-            this["response"]["includes"]("result\x22:\x22ok\x22")
-          ) {
-            const {
-              data: { message: G },
-            } = JSON["parse"](F);
-            console["info"]("body==================", JSON["parse"](F));
-            const H = G["to"]["uid"],
-              I = G["content"],
-              J = window["_aiReplyCountMap"]["get"](H),
+          if (this["_juhePddActiveSend"] !== juhePddXhrToken) return;
+          this["_juhePddActiveSend"] = null;
+          const juhePddAck = juhePddConfirmSend(juhePddCapturedSend, this);
+          if (juhePddAck) {
+            juhePddAck.shopMsgTotal = g();
+            window["context_bridge"]["send"]("get-customer-callback-result", juhePddAck);
+          }
+          if (juhePddCapturedSend && juhePddSendSucceeded(this)) {
+            const H = juhePddCapturedSend.request.messageId,
+              I = juhePddCapturedSend.request.content,
+              legacy = juhePddCapturedSend.pending ? null : window["_aiReplyCountMap"]["get"](H),
+              J = legacy?.juheAiMessageKey ? null : legacy,
               K = J && J["count"] > 0x0,
-              L = {
+              L = juhePddAck || {
                 messageId: H,
                 ...J,
                 isAiAutoReply: K && J && J?.["isAiAutoReply"],
@@ -10923,6 +11002,10 @@ const insertScriptStr = () => {
                 isReminderReply: J && J?.["isReminderReply"],
                 isAiInviteReply: J && J?.["isAiInviteReply"],
               };
+            if (!juhePddAck) {
+              delete L.juheAiMessageKey; delete L.juheAckVerified;
+              delete L.juheAiSendToken; delete L.juheAiRequestId;
+            }
             (K &&
               J &&
               (J?.["isAiInviteReply"] ||

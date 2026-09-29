@@ -1,0 +1,25 @@
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
+const {migrate}=require('./migrate-legacy-account.cjs');
+const {accountScope,scopedStorage,browserBusinessData}=require('../app-asar/dist-electron/juhe-account-cache.cjs');
+class Memory {constructor(){this.data=new Map();}get length(){return this.data.size;}key(i){return [...this.data.keys()][i]??null;}getItem(k){return this.data.get(k)??null;}setItem(k,v){this.data.set(k,String(v));}removeItem(k){this.data.delete(k);}}
+const raw=new Memory();raw.setItem('shop','legacy');
+const a=accountScope('https://one.test',1),b=accountScope('https://one.test',2),sa=scopedStorage(raw,a),sb=scopedStorage(raw,b);
+assert.notEqual(a,b);assert.notEqual(a,accountScope('https://two.test',1));assert.equal(a,accountScope('https://ONE.test/',1));
+assert.equal(sa.getItem('shop'),null);sa.setItem('shop','A');sa.setItem('ai','preserve');sa.setItem('user','old');sa.removeItem('user');assert.equal(sa.getItem('ai'),'preserve');assert.equal(scopedStorage(raw,a).getItem('shop'),'A');assert.equal(sb.getItem('shop'),null);sb.setItem('shop','B');sa.clear();assert.equal(sb.getItem('shop'),'B');assert.equal(raw.getItem('shop'),'legacy');assert.equal(sb.length,1);assert.equal(sb.key(0),'shop');
+const sanitized=browserBusinessData({getItem:k=>JSON.stringify(k==='app'?{theme:'dark',token:'exclude',apiUrl:'exclude'}:null)});assert.deepEqual(sanitized,{app:{theme:'dark'}});
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'juhe-migration-test-')),source=path.join(root,'source'),target=path.join(root,'target');fs.mkdirSync(source);fs.mkdirSync(target);
+fs.writeFileSync(path.join(source,'config.json'),JSON.stringify({userInfo:{token:'exclude'},globalAiReplyConfig:{aiReplyStrategy:'AI_RGA'},ShortcutKeys:{key:'A'}}));
+fs.writeFileSync(path.join(source,'shopData.json'),JSON.stringify({localDataList:[{id:1}]}));
+fs.writeFileSync(path.join(source,'msgHistory.db'),'synthetic-database');fs.writeFileSync(path.join(source,'msgHistory.db-wal'),'synthetic-wal');
+fs.writeFileSync(path.join(source,'loginData.json'),JSON.stringify({username:'old',password:'exclude',token:'exclude'}));fs.writeFileSync(path.join(source,'juhe-device-key.bin'),'exclude');
+fs.mkdirSync(path.join(source,'Session Data','Partitions','123'),{recursive:true});fs.writeFileSync(path.join(source,'Session Data','Partitions','123','Cookies'),'platform-cookie');
+const opts={source,target,service:'https://example.test',accountId:'7',confirmOwner:'7'};
+assert.throws(()=>migrate({...opts,confirmOwner:'8'},()=>{}));assert.throws(()=>migrate(opts,()=>{throw Error('running');}));
+const result=migrate(opts,()=>{});
+assert.equal(fs.readFileSync(path.join(result.account,'msgHistory.db'),'utf8'),'synthetic-database');assert.equal(fs.readFileSync(path.join(result.account,'msgHistory.db-wal'),'utf8'),'synthetic-wal');
+assert.equal(JSON.parse(fs.readFileSync(path.join(target,`juhe-${result.scope}.json`),'utf8')).userInfo,undefined);assert.equal(fs.existsSync(path.join(result.account,'juhe-device-key.bin')),false);
+assert.equal(JSON.parse(fs.readFileSync(path.join(result.account,'loginData.json'))).password,undefined);
+assert.equal(fs.readFileSync(path.join(target,'Session Data','Partitions',`juhe-${result.scope}--123`,'Cookies'),'utf8'),'platform-cookie');
+assert.equal(JSON.parse(fs.readFileSync(path.join(result.backup,'manifest.json'))).state,'completed');assert.throws(()=>migrate(opts,()=>{}));
+assert.equal(JSON.parse(fs.readFileSync(path.join(source,'config.json'))).userInfo.token,'exclude');
+console.log('Account cache and controlled migration checks passed. Synthetic fixture:',root);

@@ -9,3 +9,6 @@
 *.woff binary
 *.woff2 binary
 *.wav binary
+
+# Preserve the original protocol bytes recorded in PROVENANCE.md.
+electron/protobuf/protoFile/*.proto -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

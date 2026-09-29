@@ -11409,7 +11409,7 @@ const Mi = Ae({
                 _e(
                   d,
                   { type: "primary", style: { "border-radius": "8px" }, ghost: "" },
-                  { default: Le(() => [...(n[16] || (n[16] = [$e(" 联系客服 ", -1)]))]), _: 1 },
+                  { default: Le(() => [...(n[16] || (n[16] = [$e(" 客服 QQ：731241492 ", -1)]))]), _: 1 },
                 ),
                 _e(
                   d,
@@ -11684,16 +11684,8 @@ const Mi = Ae({
           m = async () => {
             h.value = !0;
             try {
-              const e = await ye();
-              ((c.value = e.filter(
-                (e) =>
-                  ("8" == e.platformType ||
-                    "11" == e.platformType ||
-                    "6" == e.platformType ||
-                    "5" == e.platformType ||
-                    "4" == e.platformType) &&
-                  0 === e.status,
-              )),
+              const e = await window.juheLocalAiCall("snapshot");
+              ((c.value = (e.shops || []).filter((shop) => shop && shop.id != null)),
                 c.value.forEach((e) => {
                   e.subAccountInfo && (p.value[e.id] = e.subAccountInfo);
                 }));
@@ -11705,7 +11697,9 @@ const Mi = Ae({
           },
           f = async () => {
             try {
-              const t = await fe({ configType: 1, userId: r.userInfo.userId }),
+              const t = await fe({ configType: 1, userId: r.userInfo.userId });
+              if (!t?.configContent) return;
+              const
                 a =
                   (null == t ? void 0 : t.configContent) && "string" == typeof t.configContent
                     ? JSON.parse(t.configContent)
@@ -11728,15 +11722,7 @@ const Mi = Ae({
                 (n.aiReplyConfig.aiWorkMode = (null == i ? void 0 : i.aiWorkMode) ?? 0),
                 1 === n.aiReplyConfig.aiHumanReplyType && 0 === c.value.length && m());
             } catch (t) {
-              ((n.aiReplyConfig = {
-                aiReplyStrategy: "AI_RGA",
-                aiHumanReplyType: 0,
-                subAccount: "",
-                aiReplyFlag: ".",
-                aiSensitiveWords: [],
-                aiWorkMode: 0,
-              }),
-                a.error("加载AI配置失败，已使用默认配置"));
+              a.error(`加载AI配置失败，已保留原有配置：${t?.msg || t?.message || "请稍后重试"}`);
             }
             var e;
           },
@@ -11759,22 +11745,9 @@ const Mi = Ae({
                     }),
                   },
                 ];
-                (await ge(t),
-                  J.postMessage(
-                    "set-global-ai-config",
-                    ue.deepClone({
-                      aiReplyStrategy: n.aiReplyConfig.aiReplyStrategy,
-                      aiHumanReplyType: n.aiReplyConfig.aiHumanReplyType,
-                      subAccount: n.aiReplyConfig.subAccount,
-                      aiSensitiveWords: ue.deepClone(n.aiReplyConfig.aiSensitiveWords),
-                      aiReplyFlag: n.aiReplyConfig.aiReplyFlag,
-                      globalAiReplySwitch: v.value,
-                      aiWorkMode: n.aiReplyConfig.aiWorkMode,
-                    }),
-                  ),
-                  a.success("保存成功"));
+                (await ge(t), a.success("保存成功"));
               } catch (t) {
-                a.error("保存失败，请稍后重试");
+                a.error(`保存AI配置失败：${t?.msg || t?.message || "请稍后重试"}`);
               } finally {
                 i.value = !1;
               }
@@ -11783,11 +11756,17 @@ const Mi = Ae({
           y = (e) => {
             1 === e && 0 === c.value.length && m();
           },
-          w = (e) => {
-            ((v.value = e),
-              (n.globalAiReplySwitch = e),
-              J.postMessage("set-global-ai-recommended-reply", e),
-              a.success("保存成功"));
+          w = async (e) => {
+            const previous = n.globalAiReplySwitch ?? 1;
+            try {
+              await window.juheLocalAiCall("switch-save", { value: Number(e) === 1 ? 1 : 0 });
+              v.value = Number(e) === 1 ? 1 : 0;
+              n.globalAiReplySwitch = v.value;
+              a.success("保存成功");
+            } catch (error) {
+              v.value = previous;
+              a.error(`保存AI开关失败：${error?.msg || error?.message || "请稍后重试"}`);
+            }
           },
           C = () => {
             ((n.aiReplyConfig = {
@@ -11803,6 +11782,13 @@ const Mi = Ae({
         return (
           Me(async () => {
             (r.userInfo.userId || (await r.getUserInfo().catch(() => {})), await f());
+            try {
+              const savedSwitch = await window.juheLocalAiCall("switch-get");
+              v.value = Number(savedSwitch.value) === 1 ? 1 : 0;
+              n.globalAiReplySwitch = v.value;
+            } catch (error) {
+              a.error(`加载AI开关失败，已保留原有设置：${error?.msg || error?.message || "请稍后重试"}`);
+            }
           }),
           t({ appStore: n }),
           (e, t) => {
@@ -11826,7 +11812,7 @@ const Mi = Ae({
                         Ve(
                           "div",
                           { class: "ai-setting-title", style: { "margin-bottom": "10px" } },
-                          " AI回复开关 ",
+                          " AI回复总开关（还需在模型连接中启用店铺） ",
                         ),
                       ],
                       -1,
@@ -11880,9 +11866,9 @@ const Mi = Ae({
                           ze(
                             "span",
                             Ho,
-                            "AI回复将以线上先行Beta版(先行测试体验版)模型进行回复(功能上有稍许差异,功能更先进,稳定性稍微比正式版稍低)",
+                            "本地接入统一使用当前模型和知识检索；此选项保留旧版偏好。",
                           ))
-                        : (Be(), ze("span", zo, "AI回复将以线上稳定版模型进行回复(更加稳定可靠)")),
+                        : (Be(), ze("span", zo, "本地接入统一使用当前模型和知识检索；此选项保留旧版偏好。")),
                     ]),
                     _e(
                       a,
@@ -11942,10 +11928,10 @@ const Mi = Ae({
                         [
                           $e(" 设置AI回复的模式,AI回复模式分为两种： "),
                           Ve("br"),
-                          $e(" 1. AI全自动接待：AI全自动接待，AI会根据客户的消息进行回复 "),
+                          $e(" 1. AI全自动接待：可自动回复普通问候；店铺、商品与订单问题依据本地资料回答，缺少依据转人工。 "),
                           Ve("br"),
                           $e(
-                            " 2. AI人机协同：AI人机协同，AI会根据客户的消息进行回复，如果AI无法回答，则转接到人工客服 ",
+                            " 2. AI人机协同：有本地知识、商品或订单依据时回复；缺少依据转人工。 ",
                           ),
                         ],
                         -1,
@@ -12658,7 +12644,9 @@ const Mi = Ae({
           a = G(),
           n = xe(!0),
           r = (e, a) => {
-            a && (t.setToken(a), t.getUserInfo());
+            a && (t.setToken(a), t.getUserInfo().catch((error) => {
+              console.warn("设置窗口刷新账号信息失败", error?.message || error);
+            }));
           };
         (J.on("set-token", r),
           Me(async () => {
@@ -12943,6 +12931,10 @@ const Mi = Ae({
                 ]),
               ]),
               Ve("main", ps, [
+                Ve("div", { class: "juhe-company-info" }, [
+                  Ve("span", null, "洛阳锦鸿技术有限公司"),
+                  Ve("span", null, "联系方式：QQ 731241492"),
+                ]),
                 "general-panel" === i.value ? (Be(), ze("div", ms, [_e(Rl)])) : je("", !0),
                 "user-info-panel" === i.value ? (Be(), ze("div", fs, [_e(bl)])) : je("", !0),
                 "shortcut-panel" === i.value ? (Be(), ze("div", gs, [_e(Xi)])) : je("", !0),

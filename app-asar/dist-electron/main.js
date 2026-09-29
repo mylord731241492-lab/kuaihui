@@ -39,10 +39,49 @@ import require$$0$7 from "constants";
 import require$$1$4 from "string_decoder";
 import { Buffer as Buffer$1 } from "node:buffer";
 const OFFLINE_TEST_APP_NAME = "快回", OFFLINE_TEST_APP_USER_MODEL_ID = "快回";
+// Display branding is independent of the legacy storage/session identity.
+const JUHE_DISPLAY_NAME = "聚禾客服平台";
+let juheAuth = null;
+let juheAiRuntime = null;
+const juheCache = createRequire(import.meta.url)('./juhe-account-cache.cjs');
+let juheAccountScope = null;
+function juhePartition(value) {
+  if (!juheAccountScope || String(value).includes(`juhe-${juheAccountScope}--`)) return value;
+  const persistent = String(value).startsWith('persist:');
+  return `${persistent ? 'persist:' : ''}juhe-${juheAccountScope}--${String(value).replace(/^persist:/, '')}`;
+}
+function juheBusinessStore() {
+  const instances = new Map();
+  return new Proxy({}, {
+    get(_, key) {
+      const name = juheAccountScope || 'signed-out';
+      if (!instances.has(name)) instances.set(name, new ElectronStore({name:`juhe-${name}`}));
+      const instance = instances.get(name), value = instance[key];
+      return typeof value === 'function' ? value.bind(instance) : value;
+    }
+  });
+}
+function juheBusinessAuthorized() {
+  const user = juheAuth?.legacyUser();
+  return !!(juheAuth?.active() && user && juheAccountScope === juheCache.accountScope(juheServiceOrigin, user.userId));
+}
+const juheSafeChannels = new Set(['close-window', 'minimize-window', 'focus-main-window', 'main-window-resized']);
+const juheOriginalOn = ipcMain$1.on.bind(ipcMain$1), juheOriginalHandle = ipcMain$1.handle.bind(ipcMain$1);
+ipcMain$1.on = (channel, listener) => juheOriginalOn(channel, (event, ...args) => {
+  if (channel === 'logout') { if (juheAuth?.isTrusted(event)) juheAuth.logout(); return; }
+  if (!juheSafeChannels.has(channel) && !juheBusinessAuthorized()) return;
+  return listener(event, ...args);
+});
+ipcMain$1.handle = (channel, listener) => juheOriginalHandle(channel, (event, ...args) => {
+  if (channel === 'juhe-auth:call' || channel === 'juhe-updates:call') return listener(event, ...args);
+  if (channel === 'logout') { if (!juheAuth?.isTrusted(event)) throw Error('页面无权访问账号接口'); return juheAuth.logout(); }
+  if (!juheSafeChannels.has(channel) && !juheBusinessAuthorized()) throw Error('请先登录并进入此账号的工作空间');
+  return listener(event, ...args);
+});
 function setupOfflineTestAppIdentity() {
   try {
     app$1.setName(OFFLINE_TEST_APP_NAME), app$1.setAppUserModelId(OFFLINE_TEST_APP_USER_MODEL_ID);
-    const e = path__default.join(app$1.getPath("appData"), OFFLINE_TEST_APP_NAME);
+    const e = process.env.JUHE_CLIENT_DATA_DIR || path__default.join(app$1.getPath("appData"), OFFLINE_TEST_APP_NAME);
     fs__default.mkdirSync(e, { recursive: !0 }), app$1.setPath("userData", e);
     try {
       const t = path__default.join(e, "logs");
@@ -73,6 +112,17 @@ function setupOfflineTestAppIdentity() {
   }
 }
 setupOfflineTestAppIdentity();
+const juheServiceOrigin = createRequire(import.meta.url)('./juhe-service.cjs').resolveServiceUrl(app$1);
+const juheScopeFile = path__default.join(app$1.getPath('userData'), 'juhe-cache-account.json');
+try {
+  const saved = JSON.parse(fs__default.readFileSync(juheScopeFile, 'utf8'));
+  if (/^[a-f0-9]{64}$/.test(saved.scope)) juheAccountScope = saved.scope;
+} catch {}
+function juheBusinessDirectory() {
+  if (juheAccountScope) return juheCache.accountDirectory(app$1.getPath('userData'), juheAccountScope);
+  const folder = path__default.join(app$1.getPath('userData'), 'accounts', 'signed-out');
+  fs__default.mkdirSync(folder, {recursive:true}); return folder;
+}
 const noopConsoleMethod = () => {
 };
 app$1.isPackaged && (console.log = noopConsoleMethod, console.info = noopConsoleMethod, console.warn = noopConsoleMethod, console.error = noopConsoleMethod, console.debug = noopConsoleMethod);
@@ -12822,7 +12872,7 @@ function requireSrc$2() {
   return e ? (requireElectronLogPreload(), src$2.exports = requireRenderer()) : t ? src$2.exports = requireMain$3() : src$2.exports = requireNode$1(), src$2.exports;
 }
 var srcExports = requireSrc$2();
-const thatLog = /* @__PURE__ */ getDefaultExportFromCjs(srcExports), store$2 = new ElectronStore(), GLOBAL_BOTTOM_LINE_KEY = "globalBottomLineReply", SINGLE_SHOP_BOTTOM_LINE_KEY = "singleShopBottomLineReplyList", GLOBAL_AI_CONFIG_KEY = "globalAiReplyConfig", SINGLE_SHOP_AI_CONFIG_KEY = "singleShopAiReplyConfig";
+const thatLog = /* @__PURE__ */ getDefaultExportFromCjs(srcExports), store$2 = juheBusinessStore(), GLOBAL_BOTTOM_LINE_KEY = "globalBottomLineReply", SINGLE_SHOP_BOTTOM_LINE_KEY = "singleShopBottomLineReplyList", GLOBAL_AI_CONFIG_KEY = "globalAiReplyConfig", SINGLE_SHOP_AI_CONFIG_KEY = "singleShopAiReplyConfig";
 function normalizeAiReplyStrategy(e) {
   if (e === "AI_RGA" || e === "AI_RGA_FILTER")
     return e;
@@ -12901,7 +12951,8 @@ function getGlobalAiReplyConfig() {
     ...getDefaultGlobalAiReplyConfig(),
     ...e,
     aiReplyStrategy: normalizeAiReplyStrategy(e.aiReplyStrategy),
-    aiSensitiveWords: Array.isArray(e.aiSensitiveWords) ? e.aiSensitiveWords : []
+    aiSensitiveWords: Array.isArray(e.aiSensitiveWords) ? e.aiSensitiveWords : [],
+    globalAiReplySwitch: store$2.get('globalAiReplySwitch', 1) === 1 ? 1 : 0
   };
 }
 function setGlobalAiReplyConfig(e) {
@@ -12960,6 +13011,7 @@ function syncShopStore(e) {
 }
 function getConfigSyncSnapshot() {
   return {
+    globalAiReplySwitch: store$2.get('globalAiReplySwitch', 1) === 1 ? 1 : 0,
     bottomLineReply: getGlobalBottomLineReplyConfig(),
     globalAiReplyConfig: getGlobalAiReplyConfig(),
     singleShopAiReplyConfig: getStoreValue(SINGLE_SHOP_AI_CONFIG_KEY),
@@ -20121,11 +20173,11 @@ const screenName = [
   "pigeon-sid"
 ], pddPassIdManager = /* @__PURE__ */ new Map(), getWebViewCookie = async (e, t) => {
   try {
-    return t === "抖店" ? (await getSession(`persist:${e}`).cookies.get({
+    return t === "抖店" ? (await getSession(juhePartition(`persist:${e}`)).cookies.get({
       domain: ".jinritemai.com"
     })).filter(
       (i) => !screenName.some((o) => i.name.startsWith(o))
-    ) : await getSession(`persist:${e}`).cookies.get({});
+    ) : await getSession(juhePartition(`persist:${e}`)).cookies.get({});
   } catch {
     return Log.error(`获取cookie失败，店铺ID：【${e}】`), [];
   }
@@ -20137,7 +20189,7 @@ ipcMain$1.handle(
 const setWebViewCookie = async (e, t = !0, r) => {
   console.log("设置cookie", e.id);
   try {
-    const n = getSession(`persist:${e.id}`), s = await n.cookies.get({}), i = new Set(
+    const n = getSession(juhePartition(`persist:${e.id}`)), s = await n.cookies.get({}), i = new Set(
       s.filter((d) => d.httpOnly).map((d) => d.name)
     ), o = (d) => typeof d.httpOnly == "boolean" ? d.httpOnly : i.has(d.name) ? !0 : void 0, a = (d) => i.has(d.name) && d.httpOnly === !1 ? (Log.warn(
       `店铺 ${e.id} 尝试将 HttpOnly cookie ${d.name} 降级为非 HttpOnly，已跳过`
@@ -20237,7 +20289,7 @@ ipcMain$1.handle(
 const setWebViewSingleCookie = async (e) => {
   try {
     let t = e.cookie.domain;
-    return !t || t === "" ? t = ".pinduoduo.com" : t.startsWith(".") || (t = `.${t}`), await getSession(`persist:${e.id}`).cookies.set({
+    return !t || t === "" ? t = ".pinduoduo.com" : t.startsWith(".") || (t = `.${t}`), await getSession(juhePartition(`persist:${e.id}`)).cookies.set({
       name: e.cookie.name,
       value: e.cookie.value,
       url: "https://mms.pinduoduo.com",
@@ -20265,7 +20317,7 @@ const clearWebViewCookie = async (e) => {
       n === e && t.push(r);
     return t.forEach((r) => {
       pddPassIdManager.delete(r), Log.info(`清理店铺 ${e} 的PASS_ID映射: ${r.substring(0, 8)}...`);
-    }), await getSession(`persist:${e}`).clearStorageData({
+    }), await getSession(juhePartition(`persist:${e}`)).clearStorageData({
       storages: ["cookies"]
     }), !0;
   } catch (t) {
@@ -20279,7 +20331,7 @@ ipcMain$1.handle(
 const removeWebViewCookie = async (e) => {
   try {
     for (const t of e.cookie)
-      await getSession(`persist:${e.id}`).cookies.remove(
+      await getSession(juhePartition(`persist:${e.id}`)).cookies.remove(
         e.domainUrl,
         t
       );
@@ -20294,7 +20346,7 @@ ipcMain$1.handle(
 );
 const clearWebViewStorage = async (e) => {
   try {
-    return await getSession(`persist:${e}`).clearStorageData({
+    return await getSession(juhePartition(`persist:${e}`)).clearStorageData({
       storages: [
         "cookies",
         "filesystem",
@@ -20319,8 +20371,8 @@ function getCookieUrl$1(e) {
   return `${t}://${r}${n}`;
 }
 const removeDuplicateCookie = async (e) => {
-  const t = await getSession(`persist:${e}`).cookies.get({});
-  installCookieRenewalMonitor(getSession(`persist:${e}`), e.toString(), [
+  const t = await getSession(juhePartition(`persist:${e}`)).cookies.get({});
+  installCookieRenewalMonitor(getSession(juhePartition(`persist:${e}`)), e.toString(), [
     "PHPSESSID",
     "PASS_ID",
     "JSESSIONID"
@@ -20328,7 +20380,7 @@ const removeDuplicateCookie = async (e) => {
   const r = t.filter((s) => s.expirationDate && s.expirationDate < Math.floor(Date.now() / 1e3));
   await Promise.all(
     r.map(
-      (s) => getSession(`persist:${e}`).cookies.remove(getCookieUrl$1(s), s.name)
+      (s) => getSession(juhePartition(`persist:${e}`)).cookies.remove(getCookieUrl$1(s), s.name)
     )
   );
   const n = t.filter((s) => {
@@ -20350,7 +20402,7 @@ const removeDuplicateCookie = async (e) => {
         );
         await Promise.all(
           c.map(
-            (u) => getSession(`persist:${e}`).cookies.remove(
+            (u) => getSession(juhePartition(`persist:${e}`)).cookies.remove(
               getCookieUrl$1(u),
               u.name
             )
@@ -20365,7 +20417,7 @@ ipcMain$1.handle(
   "remove-duplicate-cookie",
   async (e, t) => removeDuplicateCookie(t)
 );
-const __vite_import_meta_env__$1 = { VITE_API_URL: "http://khai.shihuib.cn/prod-api" }, { VITE_API_URL } = __vite_import_meta_env__$1, request = async (e, t, r) => await axios({
+const __vite_import_meta_env__$1 = { VITE_API_URL: "http://127.0.0.1:47832/unsupported-legacy/prod-api" }, { VITE_API_URL } = __vite_import_meta_env__$1, request = async (e, t, r) => await axios({
   url: VITE_API_URL + e,
   method: t,
   proxy: !1,
@@ -20565,7 +20617,7 @@ function cleanExpiredUserProfiles() {
     console.error("清理用户画像失败:", e);
   }
 }
-const require$3 = createRequire(import.meta.url), Database$1 = require$3("better-sqlite3"), dbPath = path__default.join(app$1.getPath("userData"), "msgHistory.db"), msgHistoryDB = new Database$1(dbPath, {
+const require$3 = createRequire(import.meta.url), Database$1 = require$3("better-sqlite3"), dbPath = path__default.join(juheBusinessDirectory(), "msgHistory.db"), msgHistoryDB = new Database$1(dbPath, {
   readonly: !1,
   // 读写模式
   timeout: 5e3,
@@ -23831,7 +23883,7 @@ async function saveFetchedGoodInfo(e) {
 const aiToHumanReplyList = /* @__PURE__ */ new Map();
 class AiParams {
   constructor(t, r, n, s, i, o, a, c = "", u = !1, l) {
-    const d = "http://khai.shihuib.cn/prod-api";
+    const d = "http://127.0.0.1:47832/unsupported-legacy/prod-api";
     this.vectorParam = "", this.messages = [], this.message = c || "", this.shopId = r.toString(), this.aitype = normalizeAiReplyStrategy(n), this.goodId = i || "", this.goodInfo = o || "", this.appUrl = d + "/milvus/queryVector", this.shopCategory = s, this.orderStatus = t.orderStatus || "暂无订单", this.checkUser = t.username, this.checkUserId = t.messageId, this.aibtstatus = u || !1, this.aiWorkMode = l || 0, this.orderInfo = a || "", c && this.addMessage(c, t.userId || t.messageId);
   }
   addMessage(t, r) {
@@ -23891,7 +23943,318 @@ function isAccountExpired() {
     return console.warn("[AccountExpiryGuard] Store 未初始化，默认允许操作", e), !1;
   }
 }
+// Local AI is explicitly enabled per account and shop. Legacy entitlement checks
+// remain in place for the old service; only this branch uses the user's relay.
+const juheLocalAiMessages = new Map(), juheLocalAiCustomers = new Map();
+const juheLocalProductCollections = new Map();
+let juheLocalAiJournalScope = null;
+// Existing platform callbacks correlate by customer or elapsed time, not a
+// verified send transaction. Keep them pending until a platform adapter proves
+// the transaction mapping; the dispatch token alone is not delivery evidence.
+const juheVerifiedAckPlatforms = new Set(["拼多多"]);
+function juheLoadAiDeliveryJournal() {
+  if (juheLocalAiJournalScope === juheAccountScope) return;
+  const file = path__default.join(juheBusinessDirectory(), "ai-delivery-journal.json");
+  if (fs__default.existsSync(file)) {
+    const saved = JSON.parse(fs__default.readFileSync(file, "utf8"));
+    if (saved?.version !== 1 || !Array.isArray(saved.items)) throw Error("Invalid AI delivery journal");
+    for (const item of saved.items) {
+      if (!item || !/^[a-f0-9]{64}$/.test(item.key) || item.scope !== juheAccountScope ||
+          !["sending", "unconfirmed", "confirmed"].includes(item.state)) throw Error("Invalid AI delivery entry");
+      if (item.state === "confirmed" && Number(item.expiresAt) <= Date.now()) continue;
+      juheLocalAiMessages.set(item.key, {...item, state:item.state === "sending" ? "unconfirmed" : item.state, recovered:true});
+    }
+  }
+  juheLocalAiJournalScope = juheAccountScope;
+}
+function juheSaveAiDeliveryJournal() {
+  const items = [];
+  for (const entry of juheLocalAiMessages.values()) {
+    if (entry.scope !== juheAccountScope || !["sending", "unconfirmed", "confirmed"].includes(entry.state)) continue;
+    if (entry.state === "confirmed" && entry.expiresAt <= Date.now()) continue;
+    items.push({key:entry.key, scope:entry.scope, customer:entry.customer, shopId:entry.shopId,
+      platformType:entry.platformType, state:entry.state, createdAt:entry.createdAt,
+      confirmedAt:entry.confirmedAt || null, expiresAt:entry.expiresAt || null});
+  }
+  if (items.length > 10000) throw Error("AI delivery journal is full");
+  const file = path__default.join(juheBusinessDirectory(), "ai-delivery-journal.json"), temp = `${file}.tmp`;
+  fs__default.writeFileSync(temp, JSON.stringify({version:1,items}), {encoding:"utf8",mode:0o600});
+  fs__default.renameSync(temp, file);
+}
+function juheLocalAiForShop(shopId) {
+  return !!(juheBusinessAuthorized() && !isAccountExpired() && juheAiRuntime?.enabledForShop(String(shopId)));
+}
+function juheLocalEventCurrent(event, shopId) {
+  const view = shopViewsMap.get(shopId);
+  return !!(juheBusinessAuthorized() && event?.sourceScope === juheAccountScope && event.sourceMainFrame &&
+    view && !view.webContents.isDestroyed() && event.sourceContentsId === view.webContents.id);
+}
+function juheCollectionProgress(job) {
+  if (job.scope !== juheAccountScope || !juheBusinessAuthorized()) return;
+  if (job.state !== "running") {clearTimeout(job.timer);job.timer=null;}
+  const info = {shopId:job.shopId, state:job.state, count:job.count, total:job.total, message:job.message || ""};
+  if (typeof BrowserWindow !== "undefined") for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send("juhe-ai-products-progress", info);
+  }
+}
+async function juheCollectLocalProducts({shopId}) {
+  if (!juheBusinessAuthorized()) throw Error("请先登录");
+  const match = [...initshoplist.entries()].find(([id]) => String(id) === String(shopId));
+  if (!match) throw Error("店铺不存在，请刷新店铺列表");
+  const [id, shop] = match, view = shopViewsMap.get(id);
+  if (!shop.loginInfoStatus || !view || view.webContents.isDestroyed()) throw Error("请先登录并打开该店铺");
+  if (!["拼多多", "抖店", "视频号", "小红书", "快手"].includes(shop.platformType)) throw Error("该平台暂不支持批量采集，可使用商品导入");
+  const existing = juheLocalProductCollections.get(id);
+  if (existing && existing.state === "running" && existing.expiresAt > Date.now()) return {started:true, message:"该店铺正在采集，请稍后刷新商品列表。"};
+  const scope = juheAccountScope, contentsId = view.webContents.id;
+  let sellerId = "";
+  if (shop.platformType === "小红书") {
+    // The old preload has a hard-coded seller fallback. Only start its bulk
+    // collector after the signed-in page has supplied its actual seller ID.
+    sellerId = await view.webContents.executeJavaScript("typeof window._sellerId === 'string' ? window._sellerId : ''");
+    if (!sellerId || !/^[A-Za-z0-9_-]{4,120}$/.test(sellerId)) throw Error("尚未识别到小红书当前店铺身份，请刷新登录店铺后重试");
+  }
+  if (!juheLocalEventCurrent({sourceScope:scope, sourceContentsId:contentsId, sourceMainFrame:true}, id)) throw Error("店铺或账号已变化，请重新打开采集");
+  const job = {id:crypto.randomUUID(), shopId:id, scope:juheAccountScope, contentsId:view.webContents.id,
+    state:"running", expiresAt:Date.now()+7200000, count:0, total:null, work:Promise.resolve(), seen:new Set()};
+  job.timer = setTimeout(() => {
+    if (juheLocalProductCollections.get(id) === job && job.state === "running") {
+      job.state="partial";job.message="采集尚有未返回或失败的商品，可检查商品列表后重新采集。";juheCollectionProgress(job);
+    }
+  }, 7200000);
+  job.timer.unref?.();
+  juheLocalProductCollections.set(id, job);
+  view.webContents.send("get-goods-all-detail", {id, shopId:id, type:"local", userId:juheAuth.legacyUser().userId, aiTaskId:job.id, ...(sellerId ? {sellerId} : {})});
+  return {started:true, message:"已开始从登录店铺采集商品资料。采集和学习需要一些时间，可稍后刷新商品列表。"};
+}
+function juheActiveCollection(shopId, sourceContentsId, sourceMainFrame, sourceScope) {
+  const job = juheLocalProductCollections.get(shopId), view = shopViewsMap.get(shopId);
+  if (!job || job.state !== "running" || !juheBusinessAuthorized() || job.scope !== juheAccountScope ||
+      job.expiresAt <= Date.now() || sourceScope !== job.scope || !sourceMainFrame || sourceContentsId !== job.contentsId ||
+      !view || view.webContents.isDestroyed() || view.webContents.id !== job.contentsId) return null;
+  return job;
+}
+function juheReceiveLocalProductTotal(shopId, payload, sourceContentsId, sourceMainFrame, sourceScope) {
+  const job = juheActiveCollection(shopId, sourceContentsId, sourceMainFrame, sourceScope);
+  if (!job) return false;
+  const total = Number(payload?.total);
+  if (Number.isSafeInteger(total) && total >= 0) {
+    job.total=total;
+    if (job.count >= total) job.state="complete";
+    else if (total > 1000) job.message="本次最多保存 1000 件商品，超出部分可按商品编号继续导入。";
+    juheCollectionProgress(job);
+  }
+  return true;
+}
+function juheReceiveLocalProducts(shopId, payload, sourceContentsId, sourceMainFrame, sourceScope) {
+  const job = juheActiveCollection(shopId, sourceContentsId, sourceMainFrame, sourceScope), view=shopViewsMap.get(shopId);
+  if (!job) return false;
+  if (!Array.isArray(payload)) return true;
+  const truncated = payload.length > 1000;
+  const items = payload.slice(0,1000).filter(item => item && typeof item === "object" && (item.goodId ?? item.goods_id) != null && (!item.aiTaskId || item.aiTaskId === job.id));
+  job.work = job.work.then(async () => {
+    for (const item of items) {
+      if (!juheBusinessAuthorized() || juheAccountScope !== job.scope || juheLocalProductCollections.get(shopId) !== job ||
+          view.webContents.isDestroyed() || shopViewsMap.get(shopId)?.webContents.id !== job.contentsId) return;
+      const productId = String(item.goodId ?? item.goods_id);
+      if (!productId || productId.length > 120 || job.seen.has(productId)) continue;
+      if (job.count >= 1000) {job.state="limited";job.message="本次已保存 1000 件商品，超出部分可按商品编号继续导入。";juheCollectionProgress(job);return;}
+      try {
+        const observed = {goodId:productId, goodName:item.goodName ?? item.goods_name, goodDescription:item.goodDescription ?? item.goods_desc,
+          goodCat:item.goodCat ?? item.goods_cat, goodProperties:item.goodProperties ?? item.goods_properties,
+          goodSku:item.goodSku ?? item.goods_sku, mainImage:item.mainImage ?? item.goods_url, detailImages:item.detailImages ?? item.urls,
+          source:`platform:${initshoplist.get(shopId)?.platformType || "店铺页面"}`};
+        await juheAiRuntime.captureProduct({shopId:String(shopId), productId, observed});
+        job.seen.add(productId);job.count++;
+        if (job.count % 20 === 0) await new Promise(resolve => setImmediate(resolve));
+      } catch { console.warn("[Local AI] 一条商品资料未能保存或学习，可在商品列表重试"); }
+    }
+    if (job.total !== null && job.count >= job.total) job.state="complete";
+    else if (truncated || job.count >= 1000) {job.state="limited";job.message="本次最多保存 1000 件商品，超出部分可按商品编号继续导入。";}
+    juheCollectionProgress(job);
+  }).catch(() => {job.state="failed";juheCollectionProgress(job);});
+  return true;
+}
+function juheLocalAiCustomerKey(shopId, message) {
+  return JSON.stringify([juheAccountScope, String(shopId), String(message.userId || message.messageId || message.convId || "")]);
+}
+function juheLocalAiMessageKey(shopId, message) {
+  const sourceId = message.realMessageId || message.msgId || message.sourceMessageId || message.messageTime || message.timestamp || message.time || "";
+  return crypto.createHash("sha256").update(JSON.stringify([
+    juheLocalAiCustomerKey(shopId, message), String(sourceId), String(message.content || ""),
+    String(message.goodId || message.orderGoodId || ""), String(message.orderId || "")
+  ])).digest("hex");
+}
+function juheLocalAiHasSourceId(message) {
+  return !!(message.realMessageId || message.msgId || message.sourceMessageId || message.messageTime || message.timestamp || message.time);
+}
+function juheLocalAiStillAllowed(entry) {
+  const shop = initshoplist.get(entry.shopId);
+  const view = shopViewsMap.get(entry.shopId);
+  const human = aiToHumanReplyList.get(entry.shopId) || [];
+  return entry.scope === juheAccountScope && juheLocalAiForShop(entry.shopId) && !!shop?.loginInfoStatus &&
+    view && !view.webContents.isDestroyed() && view.webContents.id === entry.contentsId &&
+    (!entry.message.juheAiSource || (entry.message.juheAiSource.scope === entry.scope && entry.message.juheAiSource.contentsId === entry.contentsId)) &&
+    !entry.cancelled && !human.some(item => item.messageId === entry.message.messageId && item.isAiToHuman);
+}
+function juheLocalAiHandoff(entry, reason) {
+  if (entry.scope !== juheAccountScope || !juheBusinessAuthorized()) return;
+  entry.reason = reason;
+  setAiToHumanReply({...entry.message, aiFailureReason:reason}, entry.shopId);
+  const win = PDDMessageWindow?.win;
+  if (win && !win.isDestroyed()) win.webContents.send("juhe-ai-pending", {
+    shopId:entry.shopId, messageId:entry.message.messageId, reason,
+    replyContent:entry.replyContent || "", deliveryState:entry.state
+  });
+}
+function juheLocalAiAck(shopId, message, source) {
+  if (!message || typeof message !== "object") return null;
+  if (!juheLocalEventCurrent(source, shopId)) return null;
+  const customer = juheLocalAiCustomerKey(shopId, message);
+  const key = message.juheAiMessageKey;
+  if (typeof key !== "string" || !/^[a-f0-9]{64}$/.test(key)) return null;
+  const candidates = [...juheLocalAiMessages.values()].filter(entry =>
+    entry.scope === juheAccountScope && entry.customer === customer && entry.contentsId === source.sourceContentsId &&
+    ["sending", "unconfirmed"].includes(entry.state) && entry.key === key);
+  // The verified platform preloads preserve the dispatch token in their ACK.
+  // Never guess a send's identity from a shared customer/conversation ID.
+  if (candidates.length !== 1 || !message.isAiAutoReply) return null;
+  const entry = candidates[0];
+  if (!juheVerifiedAckPlatforms.has(entry.platformType) || message.juheAckVerified !== true) {
+    entry.state = "unconfirmed";
+    juheLocalAiHandoff(entry, "平台未提供可核实的发送回执，请人工检查；系统不会重复发送此条回复。");
+  } else {
+    entry.state = "confirmed";
+    entry.confirmedAt = Date.now();
+    // Legacy platforms often put the customer ID in messageId. Without a true
+    // source-message identity, allow a later repeat question after one minute.
+    entry.expiresAt = entry.confirmedAt + (juheLocalAiHasSourceId(entry.message) ? 86400000 : 60000);
+    markMessageProcessed(shopId, entry.key, entry.message.content);
+    pushMessage({shopId, userId:entry.message.userId || entry.message.messageId, userName:"AI回复", role:"assistant", content:entry.replyContent, imageInfo:"", scenario:"", time:Date.now()});
+  }
+  try { juheSaveAiDeliveryJournal(); } catch { console.warn("[Local AI] 发送结果未能写入磁盘，重启后将保留待确认状态"); }
+  entry.finish?.();
+  return entry;
+}
+async function juheCaptureLocalProduct(entry, view) {
+  const message = entry.message, productId = message.goodId || message.orderGoodId;
+  if (!productId || !juheAiRuntime.productNeedsCapture(String(entry.shopId), String(productId))) return;
+  try {
+    const shop = initshoplist.get(entry.shopId);
+    const captured = message.platformType === "快手"
+      ? getGoodInfoByKs(productId, shop.cookies).then(parseGoodInfoByKs)
+      : executePlatformTask({webContents:view.webContents, task:"goodInfo", platformType:message.platformType, payload:{goodId:productId}});
+    let timer;
+    const observed = await Promise.race([captured, new Promise((_, reject) => {
+      timer=setTimeout(() => reject(Error("商品资料采集超时")), 12000);
+    })]).finally(() => clearTimeout(timer));
+    if (observed?.goodId && String(observed.goodId) !== String(productId)) return;
+    if (observed && juheLocalAiStillAllowed(entry)) await juheAiRuntime.captureProduct({
+      shopId:String(entry.shopId), productId:String(productId), observed:{...observed, source:`platform:${message.platformType || "店铺页面"}`}
+    });
+  } catch {
+    // Missing product facts stay missing. The runtime decides whether the
+    // remaining knowledge is sufficient, otherwise it requests a human.
+    console.warn("[Local AI] 商品资料采集失败，保留已有资料");
+  }
+}
+async function juheRunLocalAiMessage(entry) {
+  if (!juheLocalAiStillAllowed(entry)) { entry.state = "cancelled"; return; }
+  const message = entry.message, shopId = entry.shopId;
+  const view = shopViewsMap.get(shopId), shop = initshoplist.get(shopId);
+  if (!view || view.webContents.isDestroyed()) { entry.state = "failed"; return; }
+  entry.state = "generating";
+  try {
+    if (message.platformType === "淘工厂") {
+      view.webContents.send("get-shop-user", message);
+      const operating = await operatingWaiter.wait(shopId);
+      isUserOperating.delete(shopId);
+      if (operating?.hasContent || !juheLocalAiStillAllowed(entry)) { entry.state = "cancelled"; return; }
+    }
+    const checked = unificationAiToHuman(shopId, [message]);
+    if (checked.some(item => item.isAiToHuman)) { entry.state = "human"; return; }
+    prepareProfileForAI(message, shopId);
+    await juheCaptureLocalProduct(entry, view);
+    if (!juheLocalAiStillAllowed(entry)) { entry.state = "cancelled"; return; }
+    const config = getShopAiConfig(shopId);
+    const params = new AiParams(message, String(shop.id), config.aiReplyStrategy, shop.shopCategory,
+      message.goodId || message.orderGoodId || "", message.goodInfo, buildAiOrderInfo(message), message.content, false, config.aiWorkMode);
+    params.localMessageKey = entry.key;
+    const result = await juheAiRuntime.conversation(params);
+    if (!juheLocalAiStillAllowed(entry)) { entry.state = "cancelled"; return; }
+    if (result?.data?.code !== 200) throw Error("AI_REQUEST_FAILED");
+    const reply = parseAiReplyContent(result.data.data, shopId, message);
+    if (reply.shouldTransferToHuman || !reply.text) {
+      entry.state = "human";
+      juheLocalAiHandoff(entry, reply.reason || "知识不足或需要人工确认，请人工处理。");
+      return;
+    }
+    entry.replyContent = reply.text;
+    let imageBase64 = "";
+    if (reply.imageUrl) imageBase64 = await urlToBase64(reply.imageUrl);
+    if (!juheLocalAiStillAllowed(entry) || view.webContents.isDestroyed()) { entry.state = "cancelled"; return; }
+    const response = {...message, replyContent:reply.text, needOrder:reply.needOrder || 0, imageBase64,
+      juheAiMessageKey:entry.key, tempSendType:"AI"};
+    entry.state = "sending";
+    // Persist before dispatch. A restart must never blindly repeat an uncertain
+    // send; generated text and customer content are not written to this journal.
+    juheSaveAiDeliveryJournal();
+    // Keep an unresolved send suppressed. A timeout is not proof of failure,
+    // and resending would risk a duplicate customer-facing message.
+    await new Promise(resolve => {
+      const timer = setTimeout(() => {
+        if (entry.state === "sending") {
+          entry.state = "unconfirmed";
+          try { juheSaveAiDeliveryJournal(); } catch {}
+          juheLocalAiHandoff(entry, "发送结果尚未确认，请人工检查；系统不会自动重复发送。");
+        }
+        entry.finish = null;
+        resolve();
+      }, 20000);
+      entry.finish = () => { clearTimeout(timer); entry.finish = null; resolve(); };
+      try {
+        view.webContents.send("reply-message", message.platformType === "淘工厂" ? [response] : JSON.stringify([response]));
+      } catch (error) {
+        entry.state = "failed";
+        try { juheSaveAiDeliveryJournal(); } catch {}
+        entry.finish();
+        juheLocalAiHandoff(entry, "回复未能发送到店铺页面，请人工处理。");
+      }
+    });
+  } catch {
+    entry.state = "failed";
+    juheLocalAiHandoff(entry, "AI 生成失败，请人工处理或恢复 AI 后重试。");
+  }
+}
+function juheProcessLocalMessage(message, shopId) {
+  if (!message?.content || !juheLocalAiForShop(shopId) || !initshoplist.get(shopId)?.loginInfoStatus) return;
+  try { juheLoadAiDeliveryJournal(); } catch {
+    setAiToHumanReply({...message, aiFailureReason:"发送记录无法读取，为避免重复发送，请人工处理并检查本地数据。"}, shopId);
+    return;
+  }
+  const key = juheLocalAiMessageKey(shopId, message), previous = juheLocalAiMessages.get(key);
+  if (previous && previous.state === "confirmed" && previous.expiresAt <= Date.now()) juheLocalAiMessages.delete(key);
+  else if (previous && !["failed", "cancelled", "human"].includes(previous.state)) {
+    if (previous.recovered && previous.state === "unconfirmed") {
+      previous.message = {...message};
+      juheLocalAiHandoff(previous, "上次发送结果未确认，请人工检查；本次不会重复发送。");
+    }
+    return;
+  }
+  const customer = juheLocalAiCustomerKey(shopId, message);
+  const entry = {key, customer, shopId, scope:juheAccountScope, contentsId:shopViewsMap.get(shopId)?.webContents.id, platformType:message.platformType,
+    message:{...message}, state:"queued", createdAt:Date.now()};
+  juheLocalAiMessages.set(key, entry);
+  // Different messages in one conversation are serialized until the preceding
+  // dispatch receives an acknowledgement or is left for human inspection.
+  const before = juheLocalAiCustomers.get(customer) || Promise.resolve();
+  const job = before.catch(() => {}).then(() => juheRunLocalAiMessage(entry));
+  juheLocalAiCustomers.set(customer, job);
+  job.finally(() => { if (juheLocalAiCustomers.get(customer) === job) juheLocalAiCustomers.delete(customer); }).catch(() => {});
+  return job;
+}
 const newProcessQueue = async (e, t, r) => {
+  if (juheLocalAiForShop(t) && !e.isBottomLineAutoReply && !e.isReminderReply && !e.isAiInviteReply) return juheProcessLocalMessage(e, t);
   if (console.log("普通通道开始处理", e), console.log("id==============", t), isAccountExpired())
     return;
   if (!e.content) {
@@ -23930,6 +24293,7 @@ const newProcessQueue = async (e, t, r) => {
   for await (const o of i)
     ;
 }, newProcessQueueF = async (e, t, r) => {
+  if (juheLocalAiForShop(t) && !e.isBottomLineAutoReply && !e.isReminderReply && !e.isAiInviteReply) return juheProcessLocalMessage(e, t);
   if (isAccountExpired())
     return;
   if (!e.content) {
@@ -24058,6 +24422,7 @@ const newProcessQueue = async (e, t, r) => {
               e,
               f
             );
+            if (_.shouldTransferToHuman) { setAiToHumanReply(f, e); continue; }
             let S = "";
             if (_.imageUrl)
               try {
@@ -24202,6 +24567,7 @@ const newProcessQueue = async (e, t, r) => {
         const $ = await _API_CreateConversationNew(b);
         if ($.data.code == 200) {
           const E = parseAiReplyContent($.data.data, n, h);
+          if (E.shouldTransferToHuman) { setAiToHumanReply(h, n); continue; }
           console.log("content=========2", E);
           let q = "";
           if (E.imageUrl && (q = await urlToBase64(E.imageUrl)), E.text) {
@@ -24286,16 +24652,18 @@ function setAiToHumanReply(e, t) {
     )
   }), s = !0) : (console.log("已有则保持 true"), r[n].isAiToHuman = !0, s = !0), console.log("设置人工模式", r[n]);
   const i = getShopAiConfig(t), o = i.aiHumanReplyType, a = i.subAccount, c = i.configSource === "single" ? "单店配置" : "全局配置";
-  o === 0 ? (console.log(`  [店铺${t}] 转人工方式: 弹窗提示 (${c})`), PDDMessageWindow.win.webContents.send("set-ai-reply", {
+  const messageContents = PDDMessageWindow?.win && !PDDMessageWindow.win.isDestroyed() ? PDDMessageWindow.win.webContents : null;
+  const shopContents = shopViewsMap.get(t)?.webContents;
+  o === 0 ? (console.log(`  [店铺${t}] 转人工方式: 弹窗提示 (${c})`), messageContents?.send("set-ai-reply", {
     messageId: e.userId,
     shopId: t,
     isAiToHuman: s
   })) : o === 1 ? (console.log(
     `  [店铺${t}] 转人工方式: 转接子账号 (${c}) - 子账号: ${a}`
-  ), shopViewsMap.get(t).webContents.send("ai-transfer-human-sub", {
+  ), shopContents && !shopContents.isDestroyed() && shopContents.send("ai-transfer-human-sub", {
     ...e,
     subAccount: a
-  })) : o === 2 && (console.log(` [店铺${t}] 转人工方式: 星标标记 (${c})`), shopViewsMap.get(t).webContents.send("ai-transfer-human-mark", e)), PDDMessageWindow.win.webContents.send(
+  })) : o === 2 && (console.log(` [店铺${t}] 转人工方式: 星标标记 (${c})`), shopContents && !shopContents.isDestroyed() && shopContents.send("ai-transfer-human-mark", e)), messageContents?.send(
     "set-ai-to-human-reply-message",
     deepClone(aiToHumanReplyList)
   );
@@ -24307,6 +24675,7 @@ function parseAiReplyContent(e, t, r) {
     const c = e.output.text;
     if (typeof c == "string") {
       const u = JSON.parse(c);
+      if (u?.shouldTransferToHuman === true) return {text:"", shouldTransferToHuman:true, reason:String(u.reason || "需要人工确认"), needOrder:0};
       if (u.output && typeof u.output == "string")
         try {
           n = JSON.parse(u.output);
@@ -24316,6 +24685,9 @@ function parseAiReplyContent(e, t, r) {
             isAdd: u.isAdd || 0,
             aiText: u.aiText || "",
             floatArray: u.floatArray || [],
+            shouldTransferToHuman: u.shouldTransferToHuman === true,
+            reason: u.reason || "",
+            sourceIds: Array.isArray(u.sourceIds) ? u.sourceIds : [],
             // imageUrl:'https://puui.qpic.cn/vpic_cover/u3507ovva5y/u3507ovva5y_1679906479_hz.jpg/496',
             imageUrl: (u == null ? void 0 : u.imageUrl) || "",
             isOpen: u.isOpen,
@@ -24326,6 +24698,8 @@ function parseAiReplyContent(e, t, r) {
         n = u;
     } else
       n = e.output;
+    if (!n || typeof n !== "object" || (n.output != null && typeof n.output !== "string")) throw Error("Invalid AI response");
+    if (n.shouldTransferToHuman === true) return {text:"", shouldTransferToHuman:true, reason:String(n.reason || "需要人工确认"), needOrder:0};
     if (console.log("resInfo111", n), n != null && n.output || getShopAiConfig(t).aiReplyStrategy === "AI_RGA_FILTER" && noledgeCache.has(t) && (noledgeCache.get(t).add(r.content), unlock(t, r, 1e3)), n.isAdd == 1)
       try {
         const u = initshoplist.get(t);
@@ -24348,10 +24722,8 @@ function parseAiReplyContent(e, t, r) {
         console.error("AI遗漏处理失败:", u);
       }
   } catch (c) {
-    console.warn("解析AI返回结果失败，使用原始数据:", c), n = {
-      output: e.output.text || ".亲亲，请问有什么可以帮助您的？",
-      isAdd: 0
-    };
+    console.warn("解析AI返回结果失败，转人工处理");
+    return {text:"", shouldTransferToHuman:true, reason:"AI 返回格式不正确，请人工处理。", needOrder:0};
   }
   let s = n.output ? n.output : "";
   s.includes("运费险") && (s = s.replace("运费险", " 运费 险")), (s.includes("qq") || s.includes("QQ")) && (s = s.replace("qq", ""), s = s.replace("QQ", "")), s.includes("好评返现") && (s = s.replace("好评返现", ""));
@@ -24360,7 +24732,7 @@ function parseAiReplyContent(e, t, r) {
     text: s ? o + s : "",
     imageUrl: n.imageUrl,
     isOpen: n.isOpen,
-    shouldTransferToHuman: !1,
+    shouldTransferToHuman: !s,
     needOrder: (n == null ? void 0 : n.needOrder) || 0
   };
 }
@@ -24440,6 +24812,10 @@ const getCustomerCallbackResult = (e) => {
   var t, r;
   if (console.log("get-customer-callback-result", e), e) {
     const { id: n, data: s } = e;
+    const localAck = juheLocalAiAck(n, s, e);
+    if (s.juheAiMessageKey && !localAck) return;
+    if (!s.juheAiMessageKey && s.isAiAutoReply && juheLocalAiForShop(n)) return;
+    if (localAck && localAck.state !== "confirmed") return;
     let i = null;
     s.isBottomLineAutoReply ? i = "get-ai-replied-message" : s != null && s.isAiAutoReply && (i = "get-ai-replied-message-api");
     const o = initshoplist.get(n), a = aiToHumanReplyList.get(n), c = a == null ? void 0 : a.find((f) => f.messageId === s.messageId), u = (s == null ? void 0 : s.isAiToHuman) ?? (c == null ? void 0 : c.isAiToHuman) ?? !1, l = `${n}_${s.messageId}`, p = messageIsOpenCache.get(l) !== "1";
@@ -24785,7 +25161,7 @@ function getLocalDateTimeString() {
 }
 function getDB() {
   if (!db) {
-    const e = path__default.join(app$1.getPath("userData"), "logoLog.db");
+    const e = path__default.join(juheBusinessDirectory(), "logoLog.db");
     db = new Database(e), db.exec(`
       CREATE TABLE IF NOT EXISTS logo_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24823,7 +25199,7 @@ function insertLogoLog(e) {
 }
 const __filename$1 = fileURLToPath(import.meta.url), __dirname$2 = path__default.dirname(__filename$1);
 function isAccountExpiredInMain() {
-  return store.get("accountExpired", !1);
+  return !juheAuth?.active();
 }
 async function getPublicIp() {
   try {
@@ -25086,7 +25462,8 @@ ipcMain$1.on("get-aimessage-for-message", (e, t) => {
   mainBrowserWindow && (mainBrowserWindow == null || mainBrowserWindow.webContents.send("get-aimessage-for-message", t));
 });
 ipcMain$1.on("send-cmd-get-aimessage-for-message", (e, t) => {
-  PDDMessageWindow && PDDMessageWindow.win.webContents.send("send-cmd-get-aimessage-for-message");
+  const r = PDDMessageWindow.win;
+  r && !r.isDestroyed() && !r.webContents.isDestroyed() && r.webContents.send("send-cmd-get-aimessage-for-message");
 });
 ipcMain$1.on("shop-size-change", (e, t) => {
   const { id: r, rectData: n } = JSON.parse(t);
@@ -25202,7 +25579,7 @@ ipcMain$1.on(
 );
 ipcMain$1.on("reload-webcontents-view", (e, t) => {
   const r = shopViewsMap.get(t.shopId);
-  r && r.webContents.isDestroyed() && r.webContents.reload();
+  r && !r.webContents.isDestroyed() && r.webContents.reload();
 });
 ipcMain$1.on(
   "load-url-webcontents-view",
@@ -25237,13 +25614,14 @@ ipcMain$1.on("update-shop-remark", (e, t) => {
   });
 });
 ipcMain$1.on("set-shop-ai-set", (e, t) => {
-  showToolWindow("modal", () => {
-    toolWindows.modal && (typeof t == "string" && (t = JSON.parse(t)), pendingToolWindowData.modal = {
+  if (typeof t === 'string') { try { t = JSON.parse(t); } catch { return; } }
+  if (!t || !t.shop) return;
+  pendingToolWindowData.modal = {
       form: JSON.stringify(t.shop),
       title: "店铺AI训练",
       type: t.type
-    });
-  });
+  };
+  showToolWindow("modal");
 });
 ipcMain$1.on("set-shop-after-sales-rules", (e, t) => {
   showToolWindow("modal", () => {
@@ -25308,10 +25686,14 @@ ipcMain$1.handle("get-main-window-bounds", async () => {
   return { x: 0, y: 0, width: 0, height: 0 };
 });
 ipcMain$1.on("close-bottom-line-reply-modal", (e, t) => {
-  hideToolWindow("SingleShopBottomLineReply"), t && (sendToMainWindow({
+  hideToolWindow("SingleShopBottomLineReply");
+  if (!t) return;
+  sendToMainWindow({
     channel: "close-bottom-line-reply-modal",
     rect: t
-  }), PDDMessageWindow.win.webContents.send("close-bottom-line-reply-modal", t));
+  });
+  const r = PDDMessageWindow.win;
+  r && !r.isDestroyed() && !r.webContents.isDestroyed() && r.webContents.send("close-bottom-line-reply-modal", t);
 });
 ipcMain$1.on("open-shop-human-reply", (e, t) => {
   console.log("[AI_COPY][electron] open-shop-human-reply raw", t);
@@ -25461,9 +25843,8 @@ ipcMain$1.on("update-ImportantNotice-view", (e, t, r) => {
   }
 });
 ipcMain$1.on("open-auto-reply-modal", (e, t) => {
-  showToolWindow("AiModal", () => {
-    toolWindows.AiModal && (pendingToolWindowData.AiModal = t);
-  });
+  pendingToolWindowData.AiModal = t;
+  showToolWindow("AiModal");
 });
 ipcMain$1.on("close-auto-reply-modal", (e, t) => {
   hideToolWindow("AiModal"), t && sendToMainWindow({
@@ -25582,7 +25963,7 @@ const shopImportantNoticeView = (e) => {
     // GuideWindow 窗口透明
     backgroundColor: n,
     webPreferences: {
-      partition: `temp:${e}`,
+      partition: juhePartition(`temp:${e}`),
       nodeIntegration: !0,
       contextIsolation: !1,
       sandbox: !1,
@@ -25624,6 +26005,7 @@ const shopImportantNoticeView = (e) => {
       });
     }
 }, loadToolWindowRoute = (e, t) => {
+  juheAuth.registerBusinessContents(e.webContents);
   if (VITE_DEV_SERVER_URL) {
     e.loadURL(`${VITE_DEV_SERVER_URL}#/${t}`);
     return;
@@ -25725,6 +26107,10 @@ const deleteAllShop = () => {
     console.log(`销毁店铺==${t}, `), mainBrowserWindow.contentView.removeChildView(e), e.webContents.closeDevTools(), e.webContents.destroy();
   }), shopViewsMap.clear(), platformShopMap.clear(), creatingShops.clear(), pddcont.clear(), initshoplist.clear(), cspList.clear(), ShopRebuild.clear(), shopLoginEventState.clear(), shopGetUrl.clear(), jsList.clear(), currentShopId = null, lastshop = null;
 }, resetRuntimeForLogout = async () => {
+  juheAiRuntime?.cancelAll();
+  for (const entry of juheLocalAiMessages.values()) { entry.cancelled = true; entry.finish?.(); }
+  for (const job of juheLocalProductCollections.values()) clearTimeout(job.timer);
+  juheLocalAiMessages.clear(); juheLocalAiCustomers.clear(); juheLocalProductCollections.clear(); juheLocalAiJournalScope = null;
   notifications.clear(), toolViews.Notification && !toolViews.Notification.webContents.isDestroyed() && toolViews.Notification.webContents.send("clear-notification"), toolViews.ImportantNotice && !toolViews.ImportantNotice.webContents.isDestroyed() && toolViews.ImportantNotice.webContents.send("clear-ImportantNotice"), isGuideDisplayLocked = !1, deleteAllShop();
 }, getShopView = (e) => shopViewsMap.get(e), hideAllShopViews = () => {
   shopViewsMap.forEach((e) => {
@@ -25866,7 +26252,7 @@ async function createShopWindow(e, t = null) {
     creatingShops.add(n.id), shopViewsMap.has(n.id) && await deleteShop(n.id), n.platformType === "拼多多" && pddcont.add(n.id);
     let s = n.preload;
     s.startsWith("file://") && (s = fileURLToPath(s));
-    const i = `persist:${n.id}`;
+    const i = juhePartition(`persist:${n.id}`);
     getSession(i), n.platformType === "小红书" && getSession(i).webRequest.onBeforeSendHeaders(
       {
         urls: [
@@ -26231,6 +26617,9 @@ ${myCode.ksCode8}
         id: n.id,
         shop: n,
         channel: h,
+        sourceContentsId:o.webContents.id,
+        sourceMainFrame:g.senderFrame === o.webContents.mainFrame,
+        sourceScope:juheAccountScope,
         args: v
       }), schedule();
     }), o.webContents.loadURL(n.chatUrl), chatContainerRect && o.setBounds(chatContainerRect), shopViewsMap.set(n.id, o), r.push(n.id), shopLoadedStatus.set(n.id, !1), o.setVisible(!1), addShopToPlatform(platformShopMap, n), creatingShops.delete(n.id);
@@ -26317,6 +26706,9 @@ const setSelectShopId = (e) => {
   for (const u of e) {
     const { id: l, channel: d, args: p } = u, f = initshoplist.get(l), m = shopViewsMap.get(l), g = {
       id: l,
+      sourceContentsId:u.sourceContentsId,
+      sourceMainFrame:u.sourceMainFrame,
+      sourceScope:u.sourceScope,
       data: { ...p[0] }
     }, h = p[0];
     if (d == "send-quality-socket-message") {
@@ -26401,26 +26793,32 @@ const setSelectShopId = (e) => {
         break;
       case "get-customer-message-list":
         const y = h;
+        const localDispatch = juheLocalAiForShop(l);
+        if (localDispatch && !juheLocalEventCurrent(u, l)) break;
         if (Array.isArray(y) && y.length > 0) {
           const b = (await Promise.all(
             y.map(async ($) => {
               if ($ != null && $.messageId) {
+                $.juheAiSource = {scope:u.sourceScope, contentsId:u.sourceContentsId};
                 if ($.shopSystemId = l, $.shopName = f.shopName, $.platformType = f.platformType, $.loginUrl = f.loginUrl, console.log("[initshop] 处理消息:", {
                   messageId: $.messageId,
                   shopId: l,
                   platformType: f.platformType,
                   hasOrderId: !!$.orderId
-                }), f.botStatus == 1)
+                }), f.botStatus == 1 || juheLocalAiForShop(l))
                   try {
                     await ensureUserProfile(
                       $,
                       l,
                       f.platformType,
                       m == null ? void 0 : m.webContents
-                    ), saveMessageProfile($, l);
+                    );
+                    if ((localDispatch || juheLocalAiForShop(l)) && !juheLocalEventCurrent(u, l)) return null;
+                    saveMessageProfile($, l);
                   } catch (E) {
                     console.log("获取用户信息失败", E);
                   }
+                if ((localDispatch || juheLocalAiForShop(l)) && !juheLocalEventCurrent(u, l)) return null;
                 return console.log("消息=======>", $.content, $.type), $.content && $.type == "code" && pushMessage({
                   shopId: l,
                   userId: $.messageId,
@@ -26434,16 +26832,22 @@ const setSelectShopId = (e) => {
               }
             })
           )).filter(Boolean);
+          if ((localDispatch || juheLocalAiForShop(l)) && !juheLocalEventCurrent(u, l)) break;
           if ((n = PDDMessageWindow == null ? void 0 : PDDMessageWindow.win) == null || n.webContents.send(
             d,
             JSON.stringify(b)
-          ), userInfo = store.get("userInfo", {}), userInfo.status == 1 || userInfo.status == 2 || f.botStatus !== 1) break;
+          ), userInfo = store.get("userInfo", {}), userInfo.status == 2 || (!juheLocalAiForShop(l) && (userInfo.status == 1 || f.botStatus !== 1))) break;
           b.forEach(($) => {
             $.platformType != "淘工厂" ? newProcessQueueF($, l) : (console.log("ppppppppppp"), newProcessQueue($, l));
           });
         }
         break;
       case "reply-customer-message":
+        if ((h.juheAiMessageKey || juheLocalAiForShop(l)) && !juheLocalEventCurrent(u, l)) break;
+        if (!h.isAiAutoReply && !h.isBottomLineAutoReply && !h.isReminderReply && !h.isAiInviteReply) {
+          const customer = juheLocalAiCustomerKey(l, h);
+          for (const entry of juheLocalAiMessages.values()) if (entry.customer === customer && ["queued", "generating"].includes(entry.state)) entry.cancelled = true;
+        }
         console.log("回复消息=========", h), h.shopSystemId = l, h.platformType = f.platformType, unlock(l, h, 1e3), (s = PDDMessageWindow == null ? void 0 : PDDMessageWindow.win) == null || s.webContents.send(d, h), mainBrowserWindow.webContents.send(d, h), !h.compensate && h.content && pushMessage({
           shopId: l,
           userId: h.messageId,
@@ -26468,7 +26872,12 @@ const setSelectShopId = (e) => {
         persistOfflineShopToMainWindow(l, { shopStatus: h == null ? void 0 : h.status }), mainBrowserWindow.webContents.postMessage(d, g);
         break;
       case "get-customer-callback-result":
+        if ((h?.juheAiMessageKey || juheLocalAiForShop(l)) && !juheLocalEventCurrent(u, l)) break;
         getCustomerCallbackResult(g);
+        break;
+      case "get-goods-detail":
+        if (juheReceiveLocalProducts(l, h, u.sourceContentsId, u.sourceMainFrame, u.sourceScope)) break;
+        mainBrowserWindow.webContents.postMessage("shop-webview-message", {shopId:l, channel:d, args:p});
         break;
       case "xhs-hook-success":
         resetXhsHookRetry(l), Log.info(`[XHS hook] 店铺 ${l} 注入成功，重试次数已归零`);
@@ -26525,6 +26934,9 @@ const setSelectShopId = (e) => {
       // case 'goods-crawl-complete': // ai补充回调
       // case 'goods-crawl-error': // ai补充回调失败
       case "get-goods-all-detail-total":
+        if (juheReceiveLocalProductTotal(l, h, u.sourceContentsId, u.sourceMainFrame, u.sourceScope)) break;
+        mainBrowserWindow.webContents.postMessage("shop-webview-to-index", {id:l, channel:d, args:p});
+        break;
       // 获取商品所有条数
       case "get-create-workorder":
         mainBrowserWindow.webContents.postMessage("shop-webview-to-index", {
@@ -26631,7 +27043,7 @@ const getGoodInfoByKs = async (e, t) => {
   } catch (g) {
     return console.error("parseGoodInfoByKs error:", g, e), null;
   }
-}, __vite_import_meta_env__ = { VITE_DOMAIN: "http://khai.shihuib.cn" }, { VITE_DOMAIN } = __vite_import_meta_env__, __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url)), store$1 = new ElectronStore();
+}, __vite_import_meta_env__ = { VITE_DOMAIN: "http://127.0.0.1:47832/unsupported-legacy" }, { VITE_DOMAIN } = __vite_import_meta_env__, __dirname$1 = path$2.dirname(fileURLToPath(import.meta.url)), store$1 = juheBusinessStore();
 let mainWindow$1 = null;
 const debounceMap = /* @__PURE__ */ new Map();
 let shopJjWindow = null, currentShopJjMerchantId = null;
@@ -26640,7 +27052,7 @@ const blockShortcuts = /* @__PURE__ */ new Set(["alt+f4", "f11", "ctrl+r", "ctrl
   "ctrl+shift+i",
   "ctrl+shift+j",
   "ctrl+shift+k"
-]), LOGIN_WINDOW_WIDTH = 950, LOGIN_WINDOW_HEIGHT = 520, MAIN_WINDOW_MIN_WIDTH = 1500, MAIN_WINDOW_MIN_HEIGHT = 800, getAdminTargetURL = (e) => {
+]), LOGIN_WINDOW_WIDTH = 1200, LOGIN_WINDOW_HEIGHT = 900, MAIN_WINDOW_MIN_WIDTH = 1500, MAIN_WINDOW_MIN_HEIGHT = 800, getAdminTargetURL = (e) => {
   var t;
   if (e.shopId !== -1) {
     const r = ((t = e == null ? void 0 : e.shopName) == null ? void 0 : t.slice(0, 3)) !== "未登录";
@@ -26658,6 +27070,23 @@ const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 path$2.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path$2.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path$2.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
+function keepPromptWindowOnTop(e) {
+  const t = setInterval(() => {
+    !e.isDestroyed() && (e.setAlwaysOnTop(!0, "screen-saver"), e.restore());
+  }, 4e3);
+  e.once("closed", () => clearInterval(t));
+}
+function bindPromptWindowIpc(e, t, r) {
+  const n = (...s) => { if (juheBusinessAuthorized() && !e.isDestroyed()) r(...s); };
+  juheOriginalOn(t, n);
+  e.once("closed", () => ipcMain$1.removeListener(t, n));
+}
+function suspendPromptWindowDuringMove(e) {
+  if (!e || e.isDestroyed()) return;
+  e.setEnabled(!1);
+  setTimeout(() => { if (!e.isDestroyed()) e.setEnabled(!0); }, 100);
+  return !0;
+}
 class createWindow {
   constructor(t) {
     this.options = t;
@@ -26667,6 +27096,7 @@ class createWindow {
       this.win.loadURL(t);
       return;
     }
+    juheAuth.registerBusinessContents(this.win.webContents);
     if (VITE_DEV_SERVER_URL)
       this.win.loadURL(`${VITE_DEV_SERVER_URL}#/${t}`);
     else {
@@ -26682,13 +27112,15 @@ class createWindow {
   async createMainWindow() {
     this.isUpdating = !1, this.win = new BrowserWindow({
       icon: path$2.join(process.env.VITE_PUBLIC ?? "", "electron-vite.svg"),
-      title: OFFLINE_TEST_APP_NAME,
+      title: JUHE_DISPLAY_NAME,
       frame: !1,
       width: LOGIN_WINDOW_WIDTH,
       height: LOGIN_WINDOW_HEIGHT,
-      minWidth: LOGIN_WINDOW_WIDTH,
-      minHeight: LOGIN_WINDOW_HEIGHT,
-      resizable: !1,
+      minWidth: 900,
+      minHeight: 600,
+      resizable: !0,
+      fullscreen: !1,
+      show: !1,
       center: !0,
       webPreferences: {
         webviewTag: !0,
@@ -26703,7 +27135,7 @@ class createWindow {
         devTools: !0
       },
       ...this.options
-    }), mainWindow$1 = this.win, this.win.setMenuBarVisibility(!1), this.loadURL("");
+    }), mainWindow$1 = this.win, this.win.setMenuBarVisibility(!1), juheAuth.showLogin();
     let t;
     this.win.on("resize", () => {
       clearTimeout(t), t = setTimeout(() => {
@@ -26736,9 +27168,7 @@ class createWindow {
       BrowserWindow.getAllWindows().length === 0 && this.createMainWindow();
     }), ipcMain$1.on("exe-login-success", (n, s = !0) => {
       this.win.resizable = !0, this.win.setMinimumSize(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT), this.win.setSize(1800, 1e3), this.win.maximize(), this.win.center(), s && openMessageWindow();
-    }), ipcMain$1.handle("logout", async () => (this.win.webContents.send("app-will-quit"), this.win.unmaximize(), this.win.setMinimumSize(LOGIN_WINDOW_WIDTH, LOGIN_WINDOW_HEIGHT), this.win.setSize(LOGIN_WINDOW_WIDTH, LOGIN_WINDOW_HEIGHT), this.win.resizable = !1, this.win.center(), setTimeout(() => {
-      closeMessageWindow();
-    }, 2e3), await resetRuntimeForLogout(), !0)), this.win.on("closed", () => {
+    }), ipcMain$1.handle("logout", async () => (this.win.webContents.send("app-will-quit"), await juheAuth.logout(), !0)), this.win.on("closed", () => {
       setTimeout(() => {
         closeMessageWindow(), shopWindows.forEach((n) => {
           n.win && !n.win.isDestroyed() && n.win.close();
@@ -26768,7 +27198,7 @@ class createWindow {
         defaultId: 1,
         cancelId: 0,
         title: "提示",
-        message: `确定退出${OFFLINE_TEST_APP_NAME}?`
+        message: `确定退出${JUHE_DISPLAY_NAME}?`
       });
       s === 1 ? (_API_Logout(), this.win.webContents.send("app-will-quit"), this.win.webContents.send("clear-all-messages"), app$1.quit()) : r = !1;
     });
@@ -26788,7 +27218,7 @@ class createWindow {
       resizable: !1,
       // 允许调整大小
       webPreferences: {
-        partition: "temp:setting",
+        partition: juhePartition("temp:setting"),
         // 添加这一行，启用临时会话
         webviewTag: !0,
         // 启用 webview
@@ -26802,19 +27232,12 @@ class createWindow {
         // 允许使用开发者工具
       },
       ...this.options
-    }), this.win.setMenuBarVisibility(!1), this.win.minimizable = !1, this.loadURL("setting"), t && (this.win.webContents.on("did-finish-load", () => {
-      this.win.webContents.send("set-token", t), [500, 1e3, 2e3, 3e3].forEach((n) => {
-        setTimeout(() => {
-          this.win && this.win.webContents.send("set-token", t);
-        }, n);
-      });
-    }), this.win.webContents.on("dom-ready", () => {
-      this.win.webContents.send("set-token", t), [500, 1e3, 2e3].forEach((n) => {
-        setTimeout(() => {
-          this.win && this.win.webContents.send("set-token", t);
-        }, n);
-      });
-    })), this.win.on("closed", () => {
+    }), this.win.setMenuBarVisibility(!1), this.win.minimizable = !1;
+    const setting = this.win;
+    t && setting.webContents.once("did-finish-load", () => {
+      if (!setting.isDestroyed()) setting.webContents.send("set-token", t);
+    });
+    this.loadURL("setting"), this.win.on("closed", () => {
       this.win = null;
     });
   }
@@ -26833,7 +27256,7 @@ class createWindow {
       resizable: !1,
       // 禁止调整大小
       webPreferences: {
-        partition: "temp:workOrder",
+        partition: juhePartition("temp:workOrder"),
         // 添加这一行，启用临时会话
         webviewTag: !0,
         // 启用 webview
@@ -26877,7 +27300,7 @@ class createWindow {
         // 启用Node.js集成
         devTools: process.env.NODE_ENV === "development",
         // 允许使用开发者工具
-        partition: "persist:admin"
+        partition: juhePartition("persist:admin")
         // 使用临时会话
       },
       ...this.options
@@ -26928,7 +27351,7 @@ class createWindow {
         // 启用Node.js集成
         devTools: process.env.NODE_ENV === "development",
         // 允许使用开发者工具
-        partition: "persist:shopJj"
+        partition: juhePartition("persist:shopJj")
         // 使用临时会话
       },
       ...this.options
@@ -26972,7 +27395,7 @@ class createWindow {
       webPreferences: {
         devTools: process.env.NODE_ENV === "development",
         // 允许使用开发者工具
-        partition: `persist:${t}`
+        partition: juhePartition(`persist:${t}`)
         // 与接待页面共用同一个partition
       }
     }), this.win.setMenuBarVisibility(!1), this.win.maximize(), await this.win.loadURL(r), this.win.webContents.on("did-navigate", async (n, s) => {
@@ -27020,7 +27443,7 @@ class createWindow {
       // 隐藏在任务栏中的图标
       maximizable: !1,
       webPreferences: {
-        partition: "persist:message",
+        partition: juhePartition("persist:message"),
         // 禁止使用 Service Worker
         webSecurity: !1,
         // 允许加载不安全内容
@@ -27034,18 +27457,10 @@ class createWindow {
       x: s.x,
       y: s.y
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.win.setHasShadow(!1), this.loadURL(`message?platform=${t}&state=${s.state}&collapsed=${s.state === "collapsed" ? 1 : 0}`), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const s = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(s);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
-    }), setInterval(() => {
-      this.win && (this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.restore());
-    }, 4e3), this.win.on("close", (s) => {
+    }), keepPromptWindowOnTop(this.win), this.win.on("close", (s) => {
       this.canCloseWindow || s.preventDefault();
     });
   }
@@ -27067,7 +27482,7 @@ class createWindow {
       // 隐藏在任务栏中的图标
       maximizable: !1,
       webPreferences: {
-        partition: "temp:todoList",
+        partition: juhePartition("temp:todoList"),
         webSecurity: !1,
         // 允许加载不安全内容
         contextIsolation: !1,
@@ -27080,18 +27495,10 @@ class createWindow {
       x: Math.max(t.x, t.x + t.width - r - 24),
       y: Math.min(Math.max(t.y + 120, t.y), t.y + t.height - n)
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.loadURL("todoList"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
-    }), setInterval(() => {
-      this.win && (this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.restore());
-    }, 4e3), this.win.on("close", (t) => {
+    }), keepPromptWindowOnTop(this.win), this.win.on("close", (t) => {
       this.canCloseWindow || t.preventDefault();
     });
   }
@@ -27122,18 +27529,10 @@ class createWindow {
       x: screen.getPrimaryDisplay().workAreaSize.width - 270,
       y: screen.getPrimaryDisplay().workAreaSize.height - 193 - 406
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.loadURL("aiRepliedMessage"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
-    }), setInterval(() => {
-      this.win && (this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.restore());
-    }, 4e3), this.win.on("close", (t) => {
+    }), keepPromptWindowOnTop(this.win), this.win.on("close", (t) => {
       this.canCloseWindow || t.preventDefault();
     });
   }
@@ -27168,25 +27567,19 @@ class createWindow {
       },
       x: screen.getPrimaryDisplay().workAreaSize.width - 320,
       y: screen.getPrimaryDisplay().workAreaSize.height - 800
-    }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), ipcMain$1.on("resize-error-message-window", (t, { height: r }) => {
+    }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), bindPromptWindowIpc(this.win, "resize-error-message-window", (t, { height: r }) => {
       if (this.win && !this.win.isDestroyed()) {
         const s = this.win.getSize()[0];
         this.win.setResizable(!0), this.win.setSize(s, r, !0), this.win.setResizable(!1);
       }
-    }), ipcMain$1.on("add-ai-error-message", (t, r) => {
+    }), bindPromptWindowIpc(this.win, "add-ai-error-message", (t, r) => {
       var n;
       (n = this == null ? void 0 : this.win) == null || n.webContents.send("add-ai-error-message", r);
-    }), ipcMain$1.on("get-aierror-select-shop", (t, r) => {
+    }), bindPromptWindowIpc(this.win, "get-aierror-select-shop", (t, r) => {
       var n;
       (n = this.win) == null || n.webContents.send("get-aierror-select-shop", r);
     }), this.loadURL("aiErrorMessage"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
     }), this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.on("close", (t) => {
@@ -27221,13 +27614,7 @@ class createWindow {
       x: Math.floor((screen.getPrimaryDisplay().workAreaSize.width - 680) / 2),
       y: Math.floor((screen.getPrimaryDisplay().workAreaSize.height - 700) / 2)
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.loadURL("aiErrorEditMessage"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
     }), this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.on("close", (t) => {
@@ -27252,7 +27639,7 @@ class createWindow {
         nodeIntegration: !0,
         devTools: !1,
         // 幽灵窗口不需要开发者工具
-        partition: n
+        partition: juhePartition(n)
         // 使用相同的分区
       }
     }), this.win.webContents.setUserAgent(UA.GOOGLE_CHROME), this.win.setMenuBarVisibility(!1), this.win.loadURL(r), this.win.webContents.once("did-finish-load", () => {
@@ -27291,18 +27678,10 @@ class createWindow {
       x: screen.getPrimaryDisplay().workAreaSize.width - 330,
       y: screen.getPrimaryDisplay().workAreaSize.height - 410
     }), this.canCloseWindow = !1, this.win.setMenuBarVisibility(!1), this.loadURL("aiPromptMessage"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
-    }), setInterval(() => {
-      this.win && (this.win.setAlwaysOnTop(!0, "screen-saver"), this.win.restore());
-    }, 4e3), this.win.on("close", (t) => {
+    }), keepPromptWindowOnTop(this.win), this.win.on("close", (t) => {
       var r;
       this.canCloseWindow || (t.preventDefault(), (r = this.win) == null || r.hide());
     });
@@ -27330,13 +27709,7 @@ class createWindow {
       x: Math.floor((screen.getPrimaryDisplay().workAreaSize.width - 600) / 2),
       y: Math.floor((screen.getPrimaryDisplay().workAreaSize.height - 700) / 2)
     }), this.canCloseWindow = !0, this.win.setMenuBarVisibility(!1), this.loadURL("handleMessage"), this.win.hookWindowMessage(278, () => {
-      if (this.win) {
-        this.win.setEnabled(!1);
-        const t = setTimeout(() => {
-          this.win.setEnabled(!0), clearTimeout(t);
-        }, 100);
-        return !0;
-      }
+      return suspendPromptWindowDuringMove(this.win);
     }), this.win.on("closed", () => {
       this.win = null;
     }), this.win.on("close", () => {
@@ -41884,7 +42257,7 @@ WScript.Quit(0)`, s = path__default.dirname(this.emptyBatPath);
     return this.emptyBatPath;
   }
 }
-const API_URL = "http://khai.shihuib.cn/prod-api", crashDumpsPath = app$1.getPath("crashDumps"), store = new ElectronStore();
+const API_URL = "http://127.0.0.1:47832/unsupported-legacy/prod-api", crashDumpsPath = app$1.getPath("crashDumps"), store = juheBusinessStore();
 function clearOfflineProxyEnv() {
   ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].forEach((e) => {
     delete process.env[e];
@@ -41903,6 +42276,7 @@ function forceDirectSessionProxy(e, t = "") {
   }
 }
 function getSession(e) {
+  e = juhePartition(e);
   if (sessionCache.has(e))
     return sessionCache.get(e);
   const t = session.fromPartition(e);
@@ -42012,10 +42386,91 @@ app$1.whenReady().then(async () => {
   } catch (i) {
     Log.error(`注册表初始化失败，但应用将继续运行: ${i}`);
   }
+  juheAuth = createRequire(import.meta.url)('./juhe-auth.cjs')({
+    app: app$1, ipcMain: ipcMain$1, root: process.env.APP_ROOT, getWindow: () => mainWindow.win, serviceUrl: juheServiceOrigin,
+    onState: (user, active) => { store.set('accountExpired', !active); if (!active) hideAllShopViews(); },
+    onSuspend: () => { resetRuntimeForLogout(); closeMessageWindow(); BrowserWindow.getAllWindows().forEach(w => { if(w !== mainWindow.win && !w.isDestroyed()) w.destroy(); }); shopWindows.clear(); },
+    onEnter: (user) => {
+      const scope = juheCache.accountScope(juheServiceOrigin, user.userId);
+      if (scope !== juheAccountScope) {
+        fs__default.writeFileSync(juheScopeFile, JSON.stringify({scope}), "utf8");
+        dialog.showMessageBoxSync(mainWindow.win, {type:'info', title:JUHE_DISPLAY_NAME, message:'正在为此账号准备独立工作空间', detail:'首次进入或切换账号需要重启一次，请重启后再次登录。各账号的店铺、消息和回复设置分别保存；旧版资料保留原地，需确认归属后导入。'});
+        app$1.relaunch(); app$1.exit(0); return;
+      }
+      juheAccountScope = scope;
+      juheCache.accountDirectory(app$1.getPath('userData'), scope);
+      store.set('userInfo', { ...user, token: 'juhe-session' }); store.set('accountExpired', false);
+      const w = mainWindow.win; w.resizable = true; w.setMinimumSize(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT); w.setSize(1800, 1000); w.maximize();
+      mainWindow.loadURL('index');
+    }
+  });
+  juheAiRuntime = createRequire(import.meta.url)('./juhe-ai-runtime.cjs').createRuntime({
+    getDirectory:juheBusinessDirectory, getScope:() => juheAccountScope, authorized:juheBusinessAuthorized,
+    getGlobalConfig:getGlobalAiReplyConfig, getShopConfig:getShopAiConfig, safeStorage:electron.safeStorage,
+    collectProducts:juheCollectLocalProducts
+  });
+  createRequire(import.meta.url)('./juhe-ai-settings.cjs').createAiSettings({
+    runtime:juheAiRuntime,
+    BrowserWindow, ipcMain: ipcMain$1, root: process.env.APP_ROOT,
+    authorized: juheBusinessAuthorized,
+    trustedBusiness: event => juheAuth.isTrustedBusiness(event),
+    getDirectory: juheBusinessDirectory,
+    getSnapshot: () => {
+      const known = new Map();
+      const warnings = [];
+      const add = list => { if (Array.isArray(list)) for (const shop of list) {
+        if (!shop || shop.id == null) continue;
+        known.set(String(shop.id), {id:shop.id, shopName:String(shop.shopName || shop.merchantName || `店铺 ${shop.id}`), merchantName:String(shop.merchantName || ''), platformType:shop.platformType, status:shop.status, subAccountInfo:shop.subAccountInfo || ''});
+      }};
+      const cacheFile = path__default.join(juheBusinessDirectory(), 'shopData.json');
+      if (fs__default.existsSync(cacheFile)) {
+        try {
+          const cached = JSON.parse(fs__default.readFileSync(cacheFile, 'utf8'));
+          if (!cached || typeof cached !== 'object') throw Error('店铺缓存格式不正确');
+          add(cached.localDataList); add(cached.shopList);
+        } catch {
+          warnings.push('店铺缓存暂时无法读取，请刷新店铺列表。公共知识库和全局回复设置仍可使用。');
+        }
+      }
+      add(store.get('khai-offline-test-shops', []));
+      add(Array.from(initshoplist.values()));
+      return {shops:Array.from(known.values()), warnings, globalConfig:getGlobalAiReplyConfig(), singleShopConfig:getStoreValue(SINGLE_SHOP_AI_CONFIG_KEY)};
+    },
+    getConfig: id => id == null ? getGlobalAiReplyConfig() : getSingleShopAiReplyConfig(id),
+    saveConfig: (id, config) => {
+      if (id == null) {
+        setGlobalAiReplyConfig(config);
+        const saved = getGlobalAiReplyConfig();
+        for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('set-global-ai-config', saved);
+        return saved;
+      }
+      const saved = setSingleShopAiReplyConfig(id, config);
+      for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('set-single-shop-ai-config', saved);
+      return saved.config;
+    },
+    getSwitch: () => store$2.has('globalAiReplySwitch') ? (store$2.get('globalAiReplySwitch') === 1 ? 1 : 0) : undefined,
+    saveSwitch: value => {
+      store$2.set('globalAiReplySwitch', value);
+      for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('set-global-ai-recommended-reply', {status:value});
+    }
+  });
+  ipcMain$1.handle('juhe-cache-context', () => {
+    const imported = path__default.join(juheBusinessDirectory(), 'browser-legacy.json');
+    return {scope:juheAccountScope, legacyImportReady:fs__default.existsSync(path__default.join(juheBusinessDirectory(), 'legacy-import.json')), legacyBrowser:fs__default.existsSync(imported) ? JSON.parse(fs__default.readFileSync(imported, 'utf8')) : null};
+  });
+  store.set('accountExpired', true);
   mainWindow.createMainWindow(), (s = mainWindow.win) == null || s.on("resize", () => {
     console.log("[Main] 窗口 resize 事件触发"), updateNotificationPosition();
   }), setupFocusBasedBottomLineControl(), mainWindow.win.webContents.on("did-finish-load", () => {
-    createShopWindow(mainWindow.win);
+    if (juheAuth.active()) createShopWindow(mainWindow.win);
+  }), mainWindow.win.webContents.on("render-process-gone", (i, o) => {
+    console.error("主渲染崩溃  Renderer gone:", {
+      reason: o.reason,
+      exitCode: o.exitCode
+    });
+  });
+  // Register process-wide IPC once; login, logout and reload all navigate this window.
+  {
     const i = Math.round(os$1.totalmem() / 1024 ** 3);
     let o = 30;
     i >= 120 ? o = 200 : i >= 60 ? o = 100 : i >= 28 ? o = 60 : i >= 14 ? o = 30 : i >= 7 && (o = 15), ipcMain$1.on("get-system-login", () => {
@@ -42050,20 +42505,10 @@ app$1.whenReady().then(async () => {
       const d = webContents.fromId(l);
       !d || d.isDestroyed() || await d.session.clearCache();
     });
-  }), mainWindow.win.webContents.on("render-process-gone", (i, o) => {
-    console.error("主渲染崩溃  Renderer gone:", {
-      reason: o.reason,
-      exitCode: o.exitCode
-    });
-  });
-  const t = new AutoUpdater((i) => {
-    i.code === 1 && mainWindow.win.webContents.send("update-available"), i.code === 4 && mainWindow.win.webContents.send("update-progress", i.progress), i.code === 2 && (mainWindow.isUpdating = !0, mainWindow.win.webContents.send("update-downloaded")), i.code === -1 && (Log.error(i.error.message), mainWindow.win.webContents.send("update-error", i.error.message));
-  });
+  }
   setTimeout(() => {
     Log.info("离线测试模式：跳过更新检测");
-  }, 2e3), setupPddAftersaleDetailMonitor(), ipcMain$1.on("update-retry", () => {
-    t.checkForUpdates(!0);
-  }), setupRequestInterceptor(), ipcMain$1.on("set-bottom-line-reply-global", (i, o) => {
+  }, 2e3), setupPddAftersaleDetailMonitor(), setupRequestInterceptor(), ipcMain$1.on("set-bottom-line-reply-global", (i, o) => {
     const a = setGlobalBottomLineReplyConfig(o);
     BrowserWindow.getAllWindows().forEach((c) => {
       c.webContents.send("set-bottom-line-reply-global", a);
@@ -42071,15 +42516,16 @@ app$1.whenReady().then(async () => {
   }), ipcMain$1.handle("get-config-sync-snapshot", () => getConfigSyncSnapshot()), ipcMain$1.handle("clear-config-store", () => (clearConfigStore(), !0)), ipcMain$1.on(
     "account-expiry-changed",
     (i, o) => {
-      khaiWriteRuntimeLog("account", { event: "account-expiry-changed", data: { expired: !!(o == null ? void 0 : o.expired) } }), store.set("accountExpired", o.expired), o.expired ? hideAllShopViews() : showAllShopViews();
+      khaiWriteRuntimeLog("account", { event: "account-expiry-changed", data: { expired: !!(o == null ? void 0 : o.expired) } }), store.set("accountExpired", !juheAuth.active()), !juheAuth.active() ? hideAllShopViews() : showAllShopViews();
     }
   ), ipcMain$1.handle("get-account-expiry-status", () => store.get("accountExpired", !1)), ipcMain$1.on("set-user-info", (i, o) => {
-    khaiWriteRuntimeLog("account", { event: "set-user-info", data: { keys: o && typeof o == "object" ? Object.keys(o) : [], hasUser: !!o } }), store.set("userInfo", o);
+    khaiWriteRuntimeLog("account", { event: "set-user-info", data: { keys: o && typeof o == "object" ? Object.keys(o) : [], hasUser: !!o } }), store.set("userInfo", { ...juheAuth.legacyUser(), token: "juhe-session" });
   }), ipcMain$1.handle("get-user-info", () => store.get("userInfo")), ipcMain$1.on("sync-shop-store", (i, o) => {
     khaiWriteRuntimeLog("shop-store", { event: "sync-shop-store", data: { shopCount: khaiRuntimeShopCount(o) } }), syncShopStore(o);
   });
-  const r = path__default.join(app$1.getPath("userData"), "loginData.json"), n = path__default.join(app$1.getPath("userData"), "shopData.json");
+  const accountFile = name => path__default.join(juheCache.accountDirectory(app$1.getPath("userData"), juheAccountScope), name);
   ipcMain$1.handle("save-login-data", async (i, o) => {
+    const r = accountFile("loginData.json");
     try {
       return await promises.writeFile(
         r,
@@ -42090,6 +42536,7 @@ app$1.whenReady().then(async () => {
       return Log.error(`保存登录数据失败: ${a}`), { success: !1, error: String(a) };
     }
   }), ipcMain$1.handle("get-login-data", async () => {
+    const r = accountFile("loginData.json");
     try {
       const i = await promises.readFile(r, "utf-8"), o = JSON.parse(i);
       return khaiWriteRuntimeLog("account", { event: "get-login-data", data: { path: r, keys: o && typeof o == "object" ? Object.keys(o) : [] } }), Log.info("从文件读取登录数据成功"), o;
@@ -42097,12 +42544,14 @@ app$1.whenReady().then(async () => {
       return i.code === "ENOENT" ? (Log.info("登录数据文件不存在"), null) : (Log.error(`读取登录数据失败: ${i}`), null);
     }
   }), ipcMain$1.handle("clear-login-data", async () => {
+    const r = accountFile("loginData.json");
     try {
       return await promises.unlink(r), khaiWriteRuntimeLog("account", { event: "clear-login-data", data: { path: r } }), Log.info("登录数据文件已删除"), { success: !0 };
     } catch (i) {
       return i.code === "ENOENT" ? (Log.info("登录数据文件不存在，无需删除"), { success: !0 }) : (Log.error(`删除登录数据失败: ${i}`), { success: !1, error: String(i) });
     }
   }), ipcMain$1.handle("save-shop-data", async (i, o) => {
+    const n = accountFile("shopData.json");
     try {
       o = normalizeOfflineShopDataPayload(o);
       return await promises.writeFile(
@@ -42114,6 +42563,7 @@ app$1.whenReady().then(async () => {
       return Log.error(`保存店铺数据失败: ${a}`), { success: !1, error: String(a) };
     }
   }), ipcMain$1.handle("get-shop-data", async () => {
+    const n = accountFile("shopData.json");
     try {
       const i = await promises.readFile(n, "utf-8"), o = JSON.parse(i);
       return khaiWriteRuntimeLog("shop-store", { event: "get-shop-data", data: { path: n, shopCount: khaiRuntimeShopCount(o) } }), o;
@@ -42121,6 +42571,7 @@ app$1.whenReady().then(async () => {
       return i.code === "ENOENT" ? (Log.info("店铺数据文件不存在"), null) : (Log.error(`读取店铺数据失败: ${i}`), null);
     }
   }), ipcMain$1.handle("clear-shop-data", async () => {
+    const n = accountFile("shopData.json");
     try {
       return await promises.unlink(n), khaiWriteRuntimeLog("shop-store", { event: "clear-shop-data", data: { path: n } }), Log.info("店铺数据文件已删除"), { success: !0 };
     } catch (i) {
@@ -42411,9 +42862,9 @@ function setupPddAftersaleDetailMonitor() {
 function setupRequestInterceptor() {
   const offlineBlockFilter = {
     urls: [
-      "http://khai.shihuib.cn/*",
+      "http://127.0.0.1:47832/unsupported-legacy/*",
       "https://khai.shihuib.cn/*",
-      "http://xiaoniu.niushidai.cn/*",
+      "http://127.0.0.1:47832/unsupported-legacy/*",
       "https://xiaoniu.niushidai.cn/*",
       "https://pigeon.jinritemai.com/*",
       "https://fxg.jinritemai.com/*",
@@ -42465,7 +42916,7 @@ app$1.on("before-quit", async () => {
   var e;
   Log.warn("清理注册");
   try {
-    (e = PDDMessageWindow == null ? void 0 : PDDMessageWindow.win) == null || e.webContents.send("reported-messagelist"), RegistryService.getInstance().cleanup(), await clearShopView(), app$1.exit();
+    (e = PDDMessageWindow == null ? void 0 : PDDMessageWindow.win) == null || e.webContents.send("reported-messagelist"), RegistryService.getInstance().cleanup(), await clearShopView(), await juheAuth?.prepareQuit(), app$1.exit();
   } catch (t) {
     Log.warn(`清理注册表资源失败: ${t}`);
   }
@@ -42618,7 +43069,7 @@ function createToolView(e) {
   var r;
   const t = new WebContentsView({
     webPreferences: {
-      partition: `temp:${e}`,
+      partition: juhePartition(`temp:${e}`),
       nodeIntegration: !0,
       contextIsolation: !1,
       sandbox: !1,
@@ -42629,6 +43080,7 @@ function createToolView(e) {
       // webSecurity: true // 启用web安全
     }
   });
+  juheAuth.registerBusinessContents(t.webContents);
   if (VITE_DEV_SERVER_URL) {
     const n = `${VITE_DEV_SERVER_URL}#/${e}`;
     t.webContents.loadURL(n);
