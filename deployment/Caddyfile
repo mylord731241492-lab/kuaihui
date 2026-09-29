@@ -1,0 +1,19 @@
+{
+    email {$JUHE_TLS_EMAIL}
+}
+{$JUHE_DOMAIN} {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
+    request_body {
+        max_size 1MB
+    }
+    reverse_proxy auth:47831 {
+        header_up X-Juhe-Client-IP {remote_host}
+        header_up X-Juhe-Proxy-Token {$JUHE_PROXY_SECRET}
+    }
+}

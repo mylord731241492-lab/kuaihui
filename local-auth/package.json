@@ -1,0 +1,17 @@
+{
+  "name": "juhe-local-auth",
+  "private": true,
+  "version": "0.1.0",
+  "main": "desktop.cjs",
+  "description": "聚禾客服账号与授权本地试运行",
+  "author": "洛阳锦鸿技术有限公司",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test.mjs security-test.mjs sms-spug.test.mjs ops-probe.test.mjs admin-users.test.mjs license-codes.test.mjs sms-settings.test.mjs phone-registration.test.mjs sms-password.test.mjs unlimited-shops.test.mjs multi-device.test.mjs device-migration.test.mjs",
+    "client": "electron desktop.cjs"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

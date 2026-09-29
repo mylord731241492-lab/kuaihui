@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>聚禾 · 管理后台</title>
+  <link rel="icon" href="/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/admin.js"></script>
+</head>
+<body class="admin-page">
+<header><img src="/logo.png" alt="聚禾"><div><strong>聚禾客服平台</strong><small>管理员后台</small></div><button id="admin-logout" hidden>退出管理</button></header>
+<main>
+  <div id="message" role="status" aria-live="polite"></div>
+  <form id="admin-login" class="card admin-login-card">
+    <span class="admin-eyebrow">聚禾管理中心</span><h1>管理员登录</h1>
+    <p class="muted">管理用户、设备与套餐授权。</p>
+    <label for="admin-username">管理员账号</label><input id="admin-username" required autocomplete="username">
+    <label for="admin-password">密码</label><input id="admin-password" type="password" required autocomplete="current-password">
+    <div class="actions"><button id="login-submit" class="primary">进入后台</button></div>
+    <p class="muted">首次使用须由服务器管理员完成本地初始化。</p>
+  </form>
+  <section id="dashboard" hidden>
+    <nav class="admin-nav" aria-label="后台功能">
+      <button type="button" data-panel="users" aria-current="page">用户管理</button>
+      <button type="button" data-panel="codes">授权码</button>
+      <button type="button" data-panel="audit">管理审计</button>
+      <button type="button" data-panel="settings">管理设置</button>
+    </nav>
+    <section id="panel-users" class="admin-panel" aria-labelledby="users-heading">
+      <div class="admin-heading"><div><span class="admin-eyebrow">账号与设备</span><h1 id="users-heading">用户管理</h1><p class="muted">查看套餐状态，管理账号和已绑定设备。</p></div><button id="reload" type="button">刷新用户</button></div>
+      <div class="admin-stats" aria-label="全部用户概览">
+        <div><span>用户总数</span><strong id="summary-total">—</strong></div>
+        <div><span>套餐有效</span><strong id="summary-active">—</strong></div>
+        <div><span>待激活</span><strong id="summary-inactive">—</strong></div>
+        <div><span>已到期</span><strong id="summary-expired">—</strong></div>
+        <div><span>已停用</span><strong id="summary-disabled">—</strong></div>
+      </div>
+      <div class="card admin-users-card">
+        <form id="user-filters" class="admin-filters">
+          <div class="admin-search"><label for="user-query">搜索用户</label><input id="user-query" type="search" placeholder="输入账号或用户 ID" maxlength="40" autocomplete="off"></div>
+          <div><label for="user-status">账号状态</label><select id="user-status"><option value="all">全部状态</option><option value="active">套餐有效</option><option value="inactive">待激活</option><option value="expired">已到期</option><option value="disabled">已停用</option></select></div>
+          <div><label for="user-page-size">每页显示</label><select id="user-page-size"><option value="20">20 条</option><option value="50">50 条</option><option value="100">100 条</option></select></div>
+          <button id="user-search" class="primary">查询</button><button id="user-clear" type="button">重置</button>
+        </form>
+        <div id="users-feedback" class="admin-feedback" role="status" aria-live="polite" hidden></div>
+        <div class="table admin-user-table" id="users-table"><table><thead><tr><th>账号 / ID</th><th>状态</th><th>创建 / 最近登录</th><th>套餐到期 / 电脑额度</th><th>在线 / 绑定设备</th><th>操作</th></tr></thead><tbody id="users"></tbody></table></div>
+        <div class="admin-pagination"><span id="users-count">等待加载</span><div><button id="user-prev" type="button" disabled>上一页</button><span id="users-page">第 1 页</span><button id="user-next" type="button" disabled>下一页</button></div></div>
+      </div>
+    </section>
+    <section id="panel-codes" class="admin-panel" aria-labelledby="codes-heading" hidden>
+      <div class="admin-heading"><div><span class="admin-eyebrow">套餐授权</span><h1 id="codes-heading">授权码</h1><p class="muted">生成、查看及作废一次性授权码。</p></div><button id="codes-reload" type="button">刷新记录</button></div>
+      <form id="issue" class="card">
+        <h2>生成授权码</h2>
+        <div class="grid admin-code-fields">
+          <div><label for="code-mode">生成方式</label><select id="code-mode"><option value="random">随机生成</option><option value="custom">自定义授权码</option></select></div>
+          <div><label for="code-count">生成数量</label><input id="code-count" type="number" min="1" max="100" step="1" value="1" required><p class="admin-field-hint">随机生成支持1～100个，自定义授权码每次生成1个。</p></div>
+          <div id="custom-code-field" class="admin-full-field" hidden><label for="custom-code">自定义授权码</label><input id="custom-code" type="text" minlength="8" maxlength="64" pattern="[A-Za-z0-9_\-]{8,64}" autocomplete="off" spellcheck="false" disabled><p class="admin-field-hint">8～64位英文字母、数字、下划线或连字符；完整授权码仅本次显示。</p></div>
+          <div><label for="months">套餐时长</label><select id="months"><option value="1">月卡 · 1个月</option><option value="12">年卡 · 12个月</option><option value="days">自定义天数</option></select></div>
+          <div><label for="device-limit">同时登录电脑台数</label><input id="device-limit" type="number" min="1" max="999" step="1" value="3" required><p class="admin-field-hint">限制同时在线的电脑数量，店铺数量不限。</p></div>
+          <div id="code-days-field" hidden><label for="code-days">套餐天数</label><input id="code-days" type="number" min="1" max="3650" step="1" value="30" disabled><p class="admin-field-hint">1～3650天，从用户兑换时起算。</p></div>
+        </div>
+        <div class="actions"><button id="issue-submit" class="primary" data-mutation>生成授权码</button></div>
+        <div id="issue-feedback" class="admin-feedback" role="status" hidden></div>
+        <section id="issued-results" class="admin-issued-results" aria-labelledby="issued-heading" hidden><h3 id="issued-heading">最近一次生成</h3><p id="issued-summary" class="muted"></p><output id="new-code" hidden></output><div class="actions"><button type="button" id="copy" hidden>复制全部授权码</button><button type="button" id="download-codes" hidden>下载 TXT</button></div><p class="admin-field-hint">请及时保存。刷新页面或退出管理后，无法再次查看完整授权码。</p></section>
+        <p class="muted">生成后30天内可兑换；套餐从兑换时起算，每个授权码仅能兑换一次。</p>
+      </form>
+      <div class="card"><h2>授权码记录</h2><div id="codes-feedback" class="admin-feedback" role="status" hidden></div><div class="table"><table><thead><tr><th>尾号</th><th>时长</th><th>同时登录电脑</th><th>状态</th><th>兑换截止</th><th>创建时间</th><th>操作</th></tr></thead><tbody id="codes"></tbody></table></div></div>
+    </section>
+    <section id="panel-audit" class="admin-panel" aria-labelledby="audit-heading" hidden>
+      <div class="admin-heading"><div><span class="admin-eyebrow">操作记录</span><h1 id="audit-heading">管理审计</h1><p class="muted">查看账号与管理员操作记录，每次显示最多100条。</p></div><button id="audit-reload" type="button">刷新审计</button></div>
+      <div class="card"><div id="audit-feedback" class="admin-feedback" role="status" hidden></div><div class="table"><table><thead><tr><th>时间</th><th>操作者</th><th>操作</th><th>目标账号</th><th>说明</th></tr></thead><tbody id="audit"></tbody></table></div><div class="admin-pagination"><span id="audit-count">等待加载</span><button id="audit-older" type="button" disabled>更早记录</button></div></div>
+    </section>
+    <section id="panel-settings" class="admin-panel" aria-labelledby="settings-heading" hidden>
+      <div class="admin-heading"><div><span class="admin-eyebrow">服务与管理员账号</span><h1 id="settings-heading">管理设置</h1><p class="muted">配置短信认证服务，管理管理员密码。</p></div></div>
+      <form id="sms-settings" class="card admin-sms-card">
+        <div class="admin-card-heading"><div><h2>短信认证（Spug）</h2><p class="muted">用于现有的手机号绑定、换绑和找回密码流程。</p></div><button id="sms-reload" type="button">刷新配置</button></div>
+        <div id="sms-feedback" class="admin-feedback" role="status" hidden></div>
+        <dl id="sms-summary" class="admin-sms-summary" hidden></dl>
+        <fieldset id="sms-fields" class="admin-form-fields" disabled>
+          <div class="grid">
+            <div><label for="sms-mode">短信服务模式</label><select id="sms-mode"><option value="environment">沿用服务器环境配置</option><option value="spug">使用 Spug</option><option value="disabled">关闭短信服务</option></select></div>
+            <div><label for="sms-daily-limit">全服务每日发送上限</label><input id="sms-daily-limit" type="number" min="1" max="5000" step="1" value="100" required><p class="admin-field-hint">Spug支持1～5000条，发送失败也计入。环境模式沿用服务器配置。</p></div>
+            <div id="sms-template-field" class="admin-full-field" hidden><label for="sms-template">Spug 十分钟验证码模板 Code</label><input id="sms-template" type="password" autocomplete="off" spellcheck="false" disabled><p id="sms-template-hint" class="admin-field-hint">选择固定“十分钟内有效”、仅含 code 变量的模板，绑定手机和找回密码共用。留空保留已保存配置。</p></div>
+          </div>
+          <label for="sms-admin-password">管理员密码确认</label><input id="sms-admin-password" type="password" required autocomplete="current-password"><p class="admin-field-hint">保存短信配置前，需要重新验证当前管理员密码。</p>
+          <div class="actions"><button id="sms-save" class="primary" data-mutation>保存短信配置</button></div>
+        </fieldset>
+        <p class="admin-settings-note">配置完成不代表短信已送达。请先在 Spug 完成实名认证、模板开通与余额充值；实际发送仍受服务商审核、余额及限流规则影响。</p>
+      </form>
+      <form id="admin-change-password" class="card admin-settings-card"><h2>修改管理员密码</h2><label for="admin-old-password">原密码</label><input id="admin-old-password" type="password" required autocomplete="current-password"><label for="admin-new-password">新密码</label><input id="admin-new-password" type="password" required minlength="10" maxlength="128" autocomplete="new-password"><p class="muted">使用10～128个字符。</p><div class="actions"><button class="primary" data-mutation>修改并退出管理</button></div></form>
+    </section>
+  </section>
+</main>
+<dialog id="user-dialog" class="admin-detail-dialog" aria-labelledby="user-dialog-title">
+  <div class="admin-dialog-heading"><div><span class="admin-eyebrow">账号与绑定信息</span><h2 id="user-dialog-title">用户详情</h2></div><button id="user-dialog-close" type="button" aria-label="关闭用户详情">关闭</button></div>
+  <div id="detail-feedback" class="admin-feedback" role="status" aria-live="polite" hidden></div>
+  <div id="user-detail" hidden><dl id="detail-fields" class="admin-detail-fields"></dl><h3>绑定设备</h3><p class="muted">在线电脑占用套餐登录名额；退出后释放，断线或关闭后最迟约90秒释放。已绑定的离线电脑不占在线名额。</p><div id="devices-empty" class="admin-feedback" hidden>暂无绑定设备</div><div class="table"><table><thead><tr><th>设备名 / ID</th><th>绑定时间</th><th>最近登录</th><th>在线状态</th></tr></thead><tbody id="device-list"></tbody></table></div><div id="detail-actions" class="actions"></div></div>
+</dialog>
+<footer>洛阳锦鸿技术有限公司 · QQ 731241492</footer>
+</body></html>

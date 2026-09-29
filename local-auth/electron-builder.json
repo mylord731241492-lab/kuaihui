@@ -1,0 +1,11 @@
+{
+  "appId": "com.juhe.local-auth-trial",
+  "productName": "聚禾账号试运行",
+  "directories": { "app": "local-auth", "output": "release-auth" },
+  "electronVersion": "34.0.0",
+  "electronDist": "node_modules/electron/dist",
+  "npmRebuild": false,
+  "files": ["desktop.cjs", "preload.cjs", "package.json"],
+  "win": { "icon": "app-asar/dist/assets/juhe-logo-mark.png", "signAndEditExecutable": false },
+  "publish": null
+}

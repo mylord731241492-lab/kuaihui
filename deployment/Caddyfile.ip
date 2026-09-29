@@ -1,0 +1,29 @@
+{
+    auto_https off
+    default_sni {$JUHE_PUBLIC_IP}
+}
+:80 {
+    handle /.well-known/acme-challenge/* {
+        root * /var/www/acme
+        file_server
+    }
+    handle {
+        redir https://{$JUHE_PUBLIC_IP}{uri} 308
+    }
+}
+https://{$JUHE_PUBLIC_IP} {
+    tls /etc/letsencrypt/live/juhe-ip/fullchain.pem /etc/letsencrypt/live/juhe-ip/privkey.pem
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+        -Server
+    }
+    request_body {
+        max_size 1MB
+    }
+    reverse_proxy auth:47831 {
+        header_up X-Juhe-Client-IP {remote_host}
+        header_up X-Juhe-Proxy-Token {$JUHE_PROXY_SECRET}
+    }
+}

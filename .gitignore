@@ -13,13 +13,36 @@ resources/
 
 # Dependencies from the recovered asar
 app-asar/node_modules/
+node_modules/
+release/
+release-*/
+release-auth/
 
 # Local previews and temporary files
 preview/
 test-listens/
+output/
 *.log
 *.tmp
 *.bak
+
+# Private configuration and runtime stores
+.env
+.env.*
+!.env.example
+!.env.ip.example
+ai-relay.local.json
+AI中转站联调配置.txt
+juhe-service.json
+ai-provider.json
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.pem
+*.key
 
 # Electron runtime metadata
 LICENSE.electron.txt

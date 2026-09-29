@@ -1,0 +1,103 @@
+name: juhe-production
+x-auth: &auth
+  image: juhe-auth:3.8.0
+  build:
+    context: ..
+    dockerfile: local-auth/Dockerfile
+    args:
+      NODE_IMAGE: ${JUHE_NODE_IMAGE:-public.ecr.aws/docker/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6}
+  read_only: true
+  tmpfs: ["/tmp:size=64m,mode=1777"]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  init: true
+  restart: unless-stopped
+  mem_limit: 512m
+  cpus: 1
+services:
+  auth:
+    <<: *auth
+    env_file: .env.ip
+    environment:
+      NODE_ENV: production
+      JUHE_BIND_HOST: 0.0.0.0
+      JUHE_DATA_DIR: /data
+      JUHE_PUBLIC_ORIGIN: https://${JUHE_PUBLIC_IP:?请先执行IP部署初始化}
+      JUHE_RELEASE_DIR: /releases
+      JUHE_ALLOW_LEGACY_ADMIN_KEY: "false"
+    volumes:
+      - ./state/data:/data
+      - ./releases:/releases:ro
+  caddy:
+    image: ${JUHE_CADDY_IMAGE:-caddy:2-alpine}
+    command: [caddy, run, --config, /etc/juhe/Caddyfile.active, --adapter, caddyfile]
+    environment:
+      JUHE_PUBLIC_IP: ${JUHE_PUBLIC_IP:?请先执行IP部署初始化}
+      JUHE_PROXY_SECRET: ${JUHE_PROXY_SECRET:?请先执行IP部署初始化}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./state/ip-caddy:/etc/juhe:ro
+      - ./state/acme/webroot:/var/www/acme:ro
+      - ./state/acme/production:/etc/letsencrypt:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+    mem_limit: 256m
+    security_opt: [no-new-privileges:true]
+  certbot:
+    image: ${JUHE_CERTBOT_IMAGE:-certbot/certbot:v5.8.0}
+    profiles: [tools]
+    entrypoint: [sh, /opt/juhe/certbot-ip.sh]
+    environment:
+      JUHE_PUBLIC_IP: ${JUHE_PUBLIC_IP:?请先执行IP部署初始化}
+      JUHE_TLS_EMAIL: ${JUHE_TLS_EMAIL:?请先填写证书联系邮箱}
+    volumes:
+      - ./certbot-ip.sh:/opt/juhe/certbot-ip.sh:ro
+      - ./state/acme/webroot:/var/www/acme
+      - ./state/acme/production:/etc/letsencrypt
+      - ./state/acme/work:/var/lib/letsencrypt
+      - ./state/acme/logs:/var/log/letsencrypt
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    mem_limit: 256m
+  tls-status:
+    image: ${JUHE_NODE_IMAGE:-public.ecr.aws/docker/library/node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6}
+    profiles: [tools]
+    network_mode: host
+    entrypoint: [node, /opt/juhe/ip-tls-status.mjs]
+    command: [--ip, "${JUHE_PUBLIC_IP:?请先执行IP部署初始化}", --certificate, /etc/letsencrypt/live/juhe-ip/fullchain.pem, --output, /status/tls-status.json]
+    volumes:
+      - ./ip-tls-status.mjs:/opt/juhe/ip-tls-status.mjs:ro
+      - ./state/acme/production:/etc/letsencrypt:ro
+      - ./state/ip-caddy:/status
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+  maintenance:
+    <<: *auth
+    command: [node, ops.mjs, worker]
+    environment:
+      JUHE_DATA_DIR: /data
+      JUHE_BACKUP_DIR: /backups
+      JUHE_BACKUP_KEY_FILE: /secrets/backup.key
+      JUHE_HEALTH_URL: http://auth:47831/health
+      JUHE_BACKUP_HOURS: "24"
+      JUHE_BACKUP_RETAIN: "14"
+      JUHE_ALERT_WEBHOOK: ${JUHE_ALERT_WEBHOOK:-}
+    volumes:
+      - ./state/data:/data
+      - ./state/backups:/backups
+      - ./secrets:/secrets:ro
+    depends_on:
+      auth: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "const s=JSON.parse(require('fs').readFileSync('/backups/status.json'));if(!s.healthy||s.backupError||Date.now()-s.checkedAt>180000||Date.now()-s.lastBackup>90000000)process.exit(1)"]
+      interval: 60s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+volumes:
+  caddy-data:
+  caddy-config:
