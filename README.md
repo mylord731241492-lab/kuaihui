@@ -1,24 +1,49 @@
-# 快回离线联调版
+# 聚禾客服平台
 
-这是从 Electron 应用解包后整理的本地化联调版本代码仓库。
+这是从 Electron 客户端解包后整理的维护仓库，保留原客服工作台和平台接入，并补充账号授权、弹窗修复及本地 AI 功能。当前源码版本为 `3.8.4-juhe.6`；本次为本地候选构建，提交代码不会自动发布客户端或更新线上服务。
 
-## 提交范围
+## 仓库内容
 
-- `app-asar/dist`
-- `app-asar/dist-electron`
-- `app-asar/package.json`
+- `app-asar/dist`、`app-asar/dist-electron`：客户端页面、主进程、平台预加载脚本和本地 AI 模块。
+- `local-auth`：账号、短信验证、授权码、电脑额度及管理员服务。
+- `deployment`：账号服务部署配置。
+- `scripts`、`electron`：构建检查和所需协议资源。
+- `acceptance`：可在仓库内运行的离线回归测试。
 
-仓库不提交 Electron 运行时、安装包、重打包产物、`resources/app.asar`、`node_modules` 和 zip 包。
+不提交 Electron 运行时、安装包、重打包产物、`node_modules`、用户数据库、个人知识库或 API 密钥。
 
-## 本地打包说明
+## 本地构建
 
-编辑 `app-asar` 后，需要重新封包到：
+环境：Windows x64、Node.js 24、npm 11。在仓库根目录运行：
 
 ```powershell
-node "C:\Users\pc\Documents\风格化skill 训练\.reverse-tools\node_modules\asar\bin\asar.js" pack ".\app-asar" ".\resources\app.asar"
+npm ci
+npm --prefix app-asar ci --ignore-scripts
+npm run build:dir
 ```
 
+生成 Windows 安装包使用 `npm run build:win`。完整输出路径、检查方法和验收范围见 [构建说明](BUILD.md)。
+
+## AI 功能
+
+顶部 **AI配置** 提供模型连接、本地知识库、商品文字学习和试答。知识、商品、设置及记录按账号与店铺隔离；模型连接由用户在界面配置，密钥使用 Electron `safeStorage` 在本机加密保存。
+
+这次在原客户端上修复弹窗与 AI 设置，并重建缺失的本地 AI 流程。旧服务器内部提示词、旧云端知识和旧向量索引没有恢复。当前文字检索、商品学习及发送确认的边界见 [AI 使用与实现说明](docs/ai-runtime.md)。
+
+自动接待默认关闭。启用前需明确选择店铺，并用自己的资料试答；本轮未向真实买家发送测试消息。
+
+## 账号与部署
+
+账号服务负责登录、短信验证、授权和同时在线电脑额度；AI 资料保存在客户端，生成请求发送到用户配置的模型服务。账号服务部署见 [部署说明](deployment/README.md)，账号与电脑额度操作见 [账号指南](local-auth/account-security-guide.md)。
+
 ## 更新记录
+
+### 3.8.4-juhe.6
+
+- 修复业务弹窗授权、浏览器缓存初始化及旧 AI 设置入口，保留原账户权限校验。
+- 增加本地知识管理、模型连接、商品采集与文字学习、带来源的试答和未解决问题记录。
+- 接回原消息处理入口，增加账号变化与人工接管时的取消处理、发送去重和结果待确认状态。
+- 拼多多发送回执按本次请求核对；修复小红书旧回执队列误匹配。其余平台的自动发送结果仍需人工确认。
 
 ### 2026-06-17
 
