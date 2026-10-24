@@ -34,7 +34,7 @@ npm --prefix local-auth test
 node acceptance/run.cjs
 ```
 
-仓库内 9 项 AI 回归测试使用合成数据和模拟依赖，不需要个人 API 密钥、真实店铺或真实短信。测试清单及范围见 [回归测试说明](acceptance/README.md)。
+仓库内 10 项 AI 回归测试使用合成数据和模拟依赖，不需要个人 API 密钥、真实店铺或真实短信。测试清单及范围见 [回归测试说明](acceptance/README.md)。
 
 原生模块是否可用、Electron 窗口是否正常打开，仍需在实际构建出的客户端中检查。离线脚本通过不代表真实店铺收发验收通过。
 

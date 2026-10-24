@@ -3,26 +3,10 @@ const path=require('node:path'),crypto=require('node:crypto');
 const {createProvider,atomicWrite,readJson}=require('./juhe-ai-provider.cjs');
 const {createKnowledgeStore}=require('./juhe-ai-knowledge.cjs');
 const {createProductStore,observedText}=require('./juhe-ai-products.cjs');
+const {retrieve}=require('./juhe-ai-retrieval.cjs');
 
 function identifier(value,shared=false){const id=String(value??'');if(shared&&id==='__shared__')return id;if(!/^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/.test(id)||['constructor','prototype','__proto__'].includes(id))throw Error('请选择有效的店铺或商品');return id;}
 function plain(value,max=20000){return typeof value==='string'?value.replace(/\u0000/g,'').slice(0,max):'';}
-function normalized(value){return plain(value).toLowerCase().replace(/[\s\p{P}\p{S}]/gu,'');}
-function tokens(value){
-  const text=plain(value).toLowerCase().replace(/请问|你好|您好|一下|这个|那个|你们|我们|可以|有没有|能不能|谢谢/g,' '),result=new Set();
-  for(const word of text.match(/[a-z0-9]+|[\p{Script=Han}]+/gu)||[]){if(/^[a-z0-9]+$/.test(word))result.add(word);else if(word.length===1)result.add(word);else for(let i=0;i<word.length-1;i++)result.add(word.slice(i,i+2));}
-  return [...result];
-}
-function retrieve(records,question,productId=''){
-  const query=tokens(question),exact=normalized(question);
-  return records.filter(record=>!record.goodId||record.goodId===productId).map(record=>{
-    const title=normalized(record.title),head=normalized(record.title+' '+record.scenarios.join(' ')),body=normalized(record.content);
-    const hit=query.filter(token=>head.includes(token)||body.includes(token));
-    const titleHits=query.filter(token=>head.includes(token)).length;
-    const exactMatch=!!exact&&exact===title;
-    const score=exactMatch?1000:titleHits*4+(hit.length-titleHits)+hit.length/Math.max(query.length,1);
-    return {record,score,exact:exactMatch};
-  }).filter(item=>item.score>=2).sort((a,b)=>b.score-a.score||b.record.updatedAt.localeCompare(a.record.updatedAt)).slice(0,8);
-}
 function parseJson(text){
   const source=String(text).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
   let value;try{value=JSON.parse(source);}catch{throw Error('模型返回格式不正确，需要人工确认');}
@@ -104,7 +88,7 @@ function createRuntime(options){
     try{
       if(!provider.status().ready)throw Error('请先保存有效的模型连接');
       const matches=retrieve(getKnowledge(shopId),question,productId);
-      matchedRecords=matches.map(item=>({id:item.record.id,title:item.record.title,score:item.score,shopId:item.record.shopId}));
+      matchedRecords=matches.map(item=>({id:item.record.id,title:item.record.title,score:Math.round(item.score*100)/100,confident:item.exact||item.confident,shopId:item.record.shopId}));
       const facts=matches.map(item=>({id:'knowledge:'+item.record.id,title:item.record.title,content:item.record.content,scenarios:item.record.scenarios}));
       let product=null;
       if(productId&&shopId!=='__shared__')product=products.call('get',{shopId,productId}).record;
@@ -118,10 +102,13 @@ function createRuntime(options){
       if(Object.keys(order).length)facts.push({id:'order:current',title:'当前订单',content:JSON.stringify(order)});
       sources=facts.map(({id,title})=>({id,title}));
       const sensitive=(Array.isArray(config.aiSensitiveWords)?config.aiSensitiveWords:[]).find(word=>typeof word==='string'&&word&&question.includes(word));
-      const direct=matches.find(item=>item.exact&&Number(item.record.sendType)===1&&item.record.content);
+      // 原话发送 entries skip the model on an exact title, or on a confident top
+      // match that covers the whole question. 润色 entries always go to the model.
+      const verbatim=item=>!!item&&Number(item.record.sendType)===1&&!!item.record.content;
+      const direct=matches.find(item=>item.exact&&verbatim(item))||(matches[0]?.confident&&verbatim(matches[0])?matches[0]:null);
       if(sensitive||/转人工|人工客服|找客服|真人客服/.test(question))result=handoff('客户请求人工或命中转人工词');
       else if(config.aiReplyStrategy==='AI_RGA_FILTER'&&!facts.length)result=handoff('人机协同模式未命中本地知识、商品或订单资料，请补充资料或由人工回复');
-      else if(direct){result={answer:direct.record.content,needsHuman:false,reason:'精确命中原文回复',sources:[{id:'knowledge:'+direct.record.id,title:direct.record.title}],matchedRecords,requestId,imageUrl:direct.record.imageurls[0]||''};}
+      else if(direct){result={answer:direct.record.content,needsHuman:false,reason:direct.exact?'精确命中原文回复':'高置信命中原文回复',sources:[{id:'knowledge:'+direct.record.id,title:direct.record.title}],matchedRecords,requestId,imageUrl:direct.record.imageurls[0]||''};}
       else{
         const greeting=/^(你好|您好|在吗|有人吗|hi|hello|谢谢|好的|好|收到)[!！?？。\s]*$/i.test(question);
         if(!facts.length&&!greeting)result=handoff('本地没有可依据的知识或商品资料，请人工确认');
