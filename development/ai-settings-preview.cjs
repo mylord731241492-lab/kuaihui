@@ -34,7 +34,13 @@ function simulatedReply(body) {
   const messages = body.messages || body.input || [];
   const first = String(messages[0]?.content || '');
   if (first.startsWith('Reply with exactly OK')) return 'OK';
-  if (first.startsWith('从商品原始文字')) return JSON.stringify({summary: '（离线模拟）商品摘要', facts: []});
+  if (first.startsWith('从商品原始文字')) {
+    // Learning rejects facts that are not verbatim source text, so quote the
+    // first line of the product text as the single simulated fact.
+    const line = String(messages[1]?.content || '').split('\n').map(item => item.trim()).find(Boolean) || '';
+    const value = line.slice(0, 40);
+    return JSON.stringify({summary: '（离线模拟）' + value, facts: value ? [{field: '商品资料', value, evidence: value}] : []});
+  }
   let sources = [];
   try { sources = JSON.parse(messages[1].content).sources || []; } catch {}
   if (!sources.length) return JSON.stringify({answer: '您好，请问有什么可以帮您？（离线模拟）', needsHuman: false, reason: '问候', sourceIds: []});
