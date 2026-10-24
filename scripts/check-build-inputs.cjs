@@ -13,6 +13,7 @@ const files = [
   'app-asar/dist-electron/juhe-ai-provider.cjs',
   'app-asar/dist-electron/juhe-ai-products.cjs',
   'app-asar/dist-electron/juhe-ai-runtime.cjs',
+  'app-asar/dist-electron/juhe-ai-retrieval.cjs',
   'app-asar/dist-electron/juhe-ai-preload.cjs',
   'app-asar/dist/juhe-ai-settings.html',
   'app-asar/dist/juhe-ai-settings.js',

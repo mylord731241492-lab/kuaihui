@@ -8,6 +8,7 @@ const tests = [
   'ai-products.cjs',
   'ai-provider.cjs',
   'ai-runtime.cjs',
+  'ai-retrieval.cjs',
   'ai-settings-controller.cjs',
   'ai-main-integration.cjs',
   'ai-pdd-send-ack.cjs',

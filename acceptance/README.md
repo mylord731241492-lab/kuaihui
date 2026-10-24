@@ -14,6 +14,7 @@ node acceptance/run.cjs
 | `ai-products.cjs` | 商品采集数据、文字学习状态、原文证据校验、异步结果失效 |
 | `ai-provider.cjs` | 模型接口请求格式、模拟加密保存、限流和错误处理 |
 | `ai-runtime.cjs` | 知识检索、试答、转人工、商品学习队列和取消 |
+| `ai-retrieval.cjs` | 电商词典分词、同义词扩展、高置信原话直答及其对模型来源校验的保留 |
 | `ai-settings-controller.cjs` | 设置 IPC 权限、窗口生命周期、配置保存和迁移 |
 | `ai-main-integration.cjs` | 主进程实际逻辑的消息去重、发送状态、回执和退出清理 |
 | `ai-pdd-send-ack.cjs` | 拼多多预加载逻辑的请求与回执关联 |
